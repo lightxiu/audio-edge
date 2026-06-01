@@ -55,8 +55,6 @@ class MockKWS(BaseModel):
         logger.info(f"Mock KWS loaded with keywords: {self._keywords}")
 
     def _infer(self, audio: np.ndarray) -> InferenceResult:
-        """Mock inference — always returns no_keyword or rarely a random keyword."""
-        # Simulate very rare keyword detection (~2% chance)
         if self._rng.random() < 0.02:
             keyword = self._rng.choice(self._keywords)
             confidence = 0.5 + self._rng.random() * 0.45
@@ -73,26 +71,10 @@ class MockKWS(BaseModel):
 
 
 class SherpaKWS(BaseModel):
-    """sherpa-onnx Keyword Spotter wrapper.
+    """Keyword spotter using sherpa-onnx Zipformer-based models.
 
-    Uses sherpa-onnx's pre-trained Zipformer-based KWS models for
-    accurate, low-latency keyword detection.
-
-    Requires: pip install sherpa-onnx
-
-    Usage:
-        kws = SherpaKWS(
-            model_dir="models/kws",
-            keywords=["hey_computer", "stop", "go"],
-        )
-        kws.load()
-
-        # Streaming: feed audio chunks
-        kws.reset_stream()
-        for chunk in audio_stream:
-            result = kws.infer(chunk)
-            if result.label != "no_keyword":
-                print(f"Detected: {result.label} ({result.confidence:.2f})")
+    Falls back to MockKWS if sherpa-onnx is not installed or models
+    are not available.
     """
 
     def __init__(
@@ -145,9 +127,8 @@ class SherpaKWS(BaseModel):
 
             self._has_sherpa = True
         except ImportError:
-            logger.warning(
-                "sherpa-onnx not installed. KWS will fall back to mock. Install with: pip install sherpa-onnx"
-            )
+            logger.warning("sherpa-onnx not installed, falling back to mock KWS")
+
             self._has_sherpa = False
             self._is_loaded = True
             return
@@ -158,16 +139,10 @@ class SherpaKWS(BaseModel):
         joiner = str(model_dir / "joiner.onnx")
         tokens = str(model_dir / "tokens.txt")
 
-        # Check files exist
         for f in [encoder, decoder, joiner, tokens]:
             if not Path(f).exists():
-                raise FileNotFoundError(
-                    f"KWS model file not found: {f}. "
-                    f"Download models first with: "
-                    f"python -c \"import sherpa_onnx; sherpa_onnx.download('kws')\""
-                )
+                raise FileNotFoundError(f"KWS model file not found: {f}")
 
-        # Create keyword spotter config
         config = sherpa_onnx.KeywordSpotterConfig(
             feat_config=sherpa_onnx.FeatureConfig(
                 sample_rate=KWS_SAMPLE_RATE,
@@ -189,17 +164,8 @@ class SherpaKWS(BaseModel):
         logger.info(f"sherpa-onnx KWS loaded: {len(self._keywords)} keywords ({', '.join(self._keywords[:5])}...)")
 
     def _infer(self, audio: np.ndarray) -> InferenceResult:
-        """Run KWS inference on audio chunk.
-
-        Args:
-            audio: 1-D float32 array at 16kHz.
-
-        Returns:
-            InferenceResult with detected keyword or "no_keyword".
-        """
         self.validate_audio(audio)
 
-        # Fallback to mock if sherpa-onnx not available
         if not self._has_sherpa:
             mock = MockKWS(keywords=self._keywords)
             mock._is_loaded = True
@@ -209,18 +175,14 @@ class SherpaKWS(BaseModel):
         audio = audio.astype(np.float32)
         self._stream.accept_waveform(KWS_SAMPLE_RATE, audio)
 
-        # Check for results
         while self._spotter.is_ready(self._stream):
             self._spotter.decode_stream(self._stream)
 
-        # Get the latest result
         result_text = self._spotter.get_result(self._stream).keyword
 
         if result_text and result_text in self._keywords:
             keyword = result_text
-            # sherpa-onnx doesn't provide confidence scores for KWS,
-            # so we use a placeholder high confidence
-            confidence = 0.95
+            confidence = 0.95  # sherpa-onnx KWS doesn't expose confidence scores
         else:
             keyword = "no_keyword"
             confidence = 0.0

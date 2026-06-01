@@ -97,11 +97,8 @@ class SileroVAD(BaseModel):
             providers=providers,
         )
 
-        # Initialize the sample rate tensor (constant scalar int64)
         self._sample_rate_tensor = np.array(SILERO_SAMPLE_RATE, dtype=np.int64)
 
-        # Store input/output names by ACTUAL name (not position)
-        # Silero VAD ONNX inputs: input(float), state(float), sr(int64)
         input_names = [inp.name for inp in self._model.get_inputs()]
 
         self._input_name = "input"
@@ -110,15 +107,11 @@ class SileroVAD(BaseModel):
         self._output_name = "output"
         self._state_out_name = "stateN"
 
-        # Verify all expected names exist
         for name in [self._input_name, self._state_name, self._sr_name]:
             if name not in input_names:
                 raise RuntimeError(f"Expected input '{name}' not found in model. Available inputs: {input_names}")
 
-        # Create initial RNN state: shape [2, 1, 128]
-        # The model uses a 2-layer GRU with 128 hidden units.
-        # ONNX reports dynamic dims as None/strings — map to concrete values.
-        raw_shape = self._model.get_inputs()[1].shape  # e.g. [2, None, 128]
+        raw_shape = self._model.get_inputs()[1].shape
         state_shape = tuple(1 if (d is None or isinstance(d, str)) else d for d in raw_shape)
         self._init_state = np.zeros(state_shape, dtype=np.float32)
         self._state = self._init_state.copy()
@@ -136,17 +129,14 @@ class SileroVAD(BaseModel):
         """
         self.validate_audio(audio)
 
-        # Reshape to [batch=1, samples]
         if audio.ndim == 1:
             audio_input = audio.reshape(1, -1)
         else:
             audio_input = audio
 
-        # Ensure float32
         if audio_input.dtype != np.float32:
             audio_input = audio_input.astype(np.float32)
 
-        # Run ONNX inference
         ort_inputs = {
             self._input_name: audio_input,
             self._sr_name: self._sample_rate_tensor,

@@ -263,12 +263,9 @@ class Orchestrator:
 
         try:
             while self._running.is_set():
-                # Check duration
                 if duration_sec > 0 and (time.time() - start_time) >= duration_sec:
                     break
 
-                # Main thread sleeps — real work happens in background threads.
-                # We wake periodically to check running state and duration.
                 time.sleep(0.1)
 
         except KeyboardInterrupt:
@@ -284,19 +281,15 @@ class Orchestrator:
         window_size = 512  # Silero VAD window (32ms @ 16kHz)
 
         while self._running.is_set():
-            # Read audio chunks from capture buffer
             available = self._capture.available
             if available < window_size:
-                time.sleep(0.005)  # 5ms polling to avoid busy-wait
+                time.sleep(0.005)
                 continue
 
-            # Read one window at a time
             audio_chunk = self._capture.read(window_size).squeeze()
-
             if len(audio_chunk) < window_size:
                 continue
 
-            # --- VAD Inference ---
             speech_changed = False
             if self._vad:
                 try:
@@ -306,21 +299,17 @@ class Orchestrator:
 
                     if was_speech != self._is_speech:
                         speech_changed = True
-                        # Emit VAD state change
                         self._emit(result)
                 except Exception as e:
                     logger.error(f"VAD error: {e}")
                     continue
 
-            # --- Inference Scheduling ---
             if self._is_speech or speech_changed:
                 self._run_inference_speech(audio_chunk)
             else:
                 self._run_inference_background()
 
     def _run_inference_speech(self, audio_chunk: np.ndarray) -> None:
-        """Run speech-triggered inference tasks (KWS)."""
-        # KWS: run on every speech frame
         if self._kws and self._scheduler.is_due("kws", speech_active=True):
             try:
                 result = self._kws.infer(audio_chunk)
@@ -331,11 +320,6 @@ class Orchestrator:
             self._scheduler.mark_run("kws")
 
     def _run_inference_background(self) -> None:
-        """Run background inference tasks (SED, ASC) regardless of speech.
-
-        SED runs every ~1s, ASC every ~2-3s. Audio is accumulated in a
-        separate buffer in the background loop thread.
-        """
         pass  # Handled by _background_loop thread
 
     def _background_loop(self) -> None:

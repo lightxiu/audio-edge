@@ -148,10 +148,7 @@ class YAMNetSED(BaseModel):
             return
 
         if not self._model_path.exists():
-            logger.warning(
-                f"YAMNet model not found at {self._model_path}. "
-                "Falling back to MockSED. Export YAMNet from TF Hub to use real model."
-            )
+            logger.warning(f"YAMNet model not found at {self._model_path}, falling back to MockSED")
             self._is_loaded = True
             return
 
@@ -164,14 +161,12 @@ class YAMNetSED(BaseModel):
 
         import onnxruntime as ort
 
-        # Load ONNX model
         providers = self._get_providers()
         self._model = ort.InferenceSession(
             str(self._model_path),
             providers=providers,
         )
 
-        # Load class labels from CSV
         if self._labels_path.exists():
             with open(self._labels_path, encoding="utf-8") as f:
                 reader = csv.reader(f)
@@ -183,7 +178,6 @@ class YAMNetSED(BaseModel):
                         self._labels[idx] = name
             logger.info(f"Loaded {len(self._labels)} YAMNet class labels")
 
-        # Filter to target classes
         if self._target_classes:
             self._target_indices = [idx for idx, name in self._labels.items() if name in self._target_classes]
             logger.info(f"Filtered to {len(self._target_indices)} target classes")
@@ -191,30 +185,19 @@ class YAMNetSED(BaseModel):
         logger.info(f"YAMNet SED loaded: {len(self._labels)} classes")
 
     def _infer(self, audio: np.ndarray) -> InferenceResult:
-        """Run SED inference.
-
-        Args:
-            audio: 1-D float32 array at 16kHz, 0.96s recommended.
-
-        Returns:
-            InferenceResult with top sound event or "Silence".
-        """
         self.validate_audio(audio)
 
-        # Fallback to mock if model not loaded
         if self._model is None:
             mock = MockSED(classes=list(self._labels.values()) if self._labels else None)
             mock._is_loaded = True
             return mock._infer(audio)
 
-        # Compute mel spectrogram onnx input
         mel_spec = self._extract_yamnet_mel(audio)
         mel_spec = mel_spec.astype(np.float32).reshape(1, 96, 64)
 
-        # Run ONNX inference
         input_name = self._model.get_inputs()[0].name
         scores, embeddings = self._model.run(None, {input_name: mel_spec})
-        scores = scores.squeeze()  # [521]
+        scores = scores.squeeze()
 
         # Find top class
         if self._target_classes:

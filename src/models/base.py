@@ -94,7 +94,7 @@ class BaseModel(ABC):
 
         if not self._model_path.exists():
             raise FileNotFoundError(
-                f"Model file not found: {self._model_path}. Run `python scripts/download_models.py` first."
+                f"Model file not found: {self._model_path}. Download models with: python scripts/download_models.py"
             )
 
         logger.info(f"Loading {self.task_name} model from {self._model_path} (backend={self._backend})")
@@ -103,7 +103,6 @@ class BaseModel(ABC):
         logger.info(f"{self.task_name} model loaded successfully")
 
     def unload(self) -> None:
-        """Unload the model and free resources."""
         self._model = None
         self._is_loaded = False
         logger.debug(f"{self.task_name} model unloaded")
@@ -147,6 +146,6 @@ class BaseModel(ABC):
             ValueError: If audio format is incorrect.
         """
         if audio.ndim != 1:
-            raise ValueError(f"Expected 1-D audio array, got shape {audio.shape}. Use audio.squeeze() for mono input.")
+            raise ValueError(f"Expected 1-D audio array, got shape {audio.shape}")
         if audio.dtype != np.float32:
-            raise ValueError(f"Expected float32 audio, got {audio.dtype}. Use audio.astype(np.float32).")
+            raise ValueError(f"Expected float32 audio, got {audio.dtype}")

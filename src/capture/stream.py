@@ -87,11 +87,6 @@ class AudioCapture:
         return "default"
 
     def start(self) -> None:
-        """Start the audio capture stream.
-
-        Raises:
-            RuntimeError: If already running.
-        """
         if self._is_running.is_set():
             raise RuntimeError("AudioCapture is already running")
 

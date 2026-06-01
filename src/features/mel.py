@@ -55,30 +55,21 @@ def mel_filter_bank(
     """
     n_freqs = n_fft // 2 + 1
 
-    # Convert frequencies to mel scale
     mel_min = _hz_to_mel(f_min)
     mel_max = _hz_to_mel(f_max)
-
-    # Create equally spaced mel points
     mel_points = np.linspace(mel_min, mel_max, n_mels + 2)
     hz_points = _mel_to_hz(mel_points)
-
-    # Convert to FFT bin indices
     bin_indices = np.floor((n_fft + 1) * hz_points / sample_rate).astype(int)
 
-    # Create filter bank
     filters = np.zeros((n_mels, n_freqs), dtype=np.float32)
-
     for m in range(n_mels):
         f_start = bin_indices[m]
         f_center = bin_indices[m + 1]
         f_end = bin_indices[m + 2]
 
-        # Rising slope
         if f_center > f_start:
             filters[m, f_start:f_center] = (np.arange(f_start, f_center) - f_start) / (f_center - f_start)
 
-        # Falling slope
         if f_end > f_center:
             filters[m, f_center:f_end] = (f_end - np.arange(f_center, f_end)) / (f_end - f_center)
 
@@ -117,30 +108,21 @@ def compute_mel_spectrogram(
 
     audio = audio.astype(np.float32)
 
-    # STFT
     n_frames = 1 + (len(audio) - n_fft) // hop_length
     if n_frames <= 0:
-        # Audio shorter than n_fft — pad
         audio = np.pad(audio, (0, n_fft - len(audio)), mode="constant")
         n_frames = 1
 
-    # Create window
     win = get_window(window, n_fft, fftbins=True).astype(np.float32)
-
-    # Pre-allocate spectrogram
     magnitude = np.zeros((n_fft // 2 + 1, n_frames), dtype=np.float32)
 
     for i in range(n_frames):
         start = i * hop_length
         frame = audio[start : start + n_fft] * win
-        spec = np.abs(rfft(frame)) ** power
-        magnitude[:, i] = spec
+        magnitude[:, i] = np.abs(rfft(frame)) ** power
 
-    # Apply mel filter bank
     mel_filters = mel_filter_bank(n_mels, n_fft, sample_rate, f_min, f_max)
     mel_spec = np.dot(mel_filters, magnitude)
-
-    # Convert to log scale (dB)
     mel_spec = np.log(np.maximum(mel_spec, 1e-10))
 
     return MelSpectrogram(
@@ -190,7 +172,6 @@ def compute_mfcc(
         f_max=f_max,
     )
 
-    # DCT type-II on log mel spectrogram
     mfcc_features = _dct_type2(mel.features, n_mfcc=n_mfcc)
 
     return MFCC(

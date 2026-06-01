@@ -41,39 +41,28 @@ class RingBuffer:
 
     @property
     def capacity(self) -> int:
-        """Buffer capacity in samples."""
         return self._capacity
 
     @property
     def channels(self) -> int:
-        """Number of audio channels."""
         return self._channels
 
     @property
     def available(self) -> int:
-        """Number of unread samples available."""
         return self._total_written - self._total_read
 
     def write(self, data: np.ndarray) -> None:
-        """Write audio samples to the buffer (called from capture callback).
-
-        Args:
-            data: numpy array of shape (n_samples, channels).
-        """
         n = len(data)
         if n > self._capacity:
-            # Input larger than buffer — only keep the tail
             data = data[-self._capacity :]
             n = self._capacity
 
-        # Write to buffer with wrap-around
         idx = self._write_idx
         end = idx + n
 
         if end <= self._capacity:
             self._buffer[idx:end] = data
         else:
-            # Wraps around
             first_part = self._capacity - idx
             self._buffer[idx:] = data[:first_part]
             self._buffer[: end - self._capacity] = data[first_part:]
@@ -81,8 +70,6 @@ class RingBuffer:
         self._write_idx = (self._write_idx + n) % self._capacity
         self._total_written += n
 
-        # If consumer is falling behind, advance read pointer to avoid
-        # reading very stale data (keep at most capacity samples)
         if self.available > self._capacity:
             self._total_read = self._total_written - self._capacity
 

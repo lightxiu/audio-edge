@@ -112,7 +112,6 @@ def save_config(config: dict[str, Any], path: str | Path) -> None:
 
 
 def _deep_copy(d: dict) -> dict:
-    """Simple deep copy via YAML round-trip (handles nested dicts/lists cleanly)."""
     import copy
 
     return copy.deepcopy(d)

@@ -84,19 +84,10 @@ class Scheduler:
         return task.due
 
     def mark_run(self, name: str) -> None:
-        """Mark a task as having just run."""
         if name in self.tasks:
             self.tasks[name].mark_run()
 
     def get_due_tasks(self, speech_active: bool = True) -> list[str]:
-        """Get list of task names that are due to run.
-
-        Args:
-            speech_active: Whether speech is currently detected.
-
-        Returns:
-            List of task names.
-        """
         return [name for name in self.tasks if self.is_due(name, speech_active)]
 
     def reset(self) -> None:

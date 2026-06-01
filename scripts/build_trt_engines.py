@@ -101,13 +101,11 @@ def build_trt_engine(
     logger.info(f"Building TensorRT engine: {onnx_path.name} → {engine_path.name}")
     logger.info(f"  FP16: {use_fp16}, Workspace: {workspace_gb}GB")
 
-    # Create builder
     logger_ = trt.Logger(trt.Logger.WARNING)
     builder = trt.Builder(logger_)
     network_flags = 1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
     network = builder.create_network(network_flags)
 
-    # Parse ONNX
     parser = trt.OnnxParser(network, logger_)
     with open(onnx_path, "rb") as f:
         if not parser.parse(f.read()):
@@ -115,7 +113,6 @@ def build_trt_engine(
                 logger.error(f"  ONNX parse error: {parser.get_error(i)}")
             return False
 
-    # Create build config
     config = builder.create_builder_config()
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace_gb * (1024**3))
 
@@ -126,7 +123,6 @@ def build_trt_engine(
         else:
             logger.warning("  FP16 not supported on this platform, using FP32")
 
-    # Set optimization profiles for dynamic shapes
     if input_shapes:
         profile = builder.create_optimization_profile()
         for input_name, shapes in input_shapes.items():
