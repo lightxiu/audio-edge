@@ -14,7 +14,6 @@ from src.models.kws import MockKWS
 from src.pipeline.aggregator import AggregatorConfig, EventAggregator
 from src.pipeline.scheduler import Scheduler
 
-
 # --- Scheduler Tests ---
 
 
@@ -103,16 +102,12 @@ class TestEventAggregator:
 
     def test_kws_first_fire(self, agg):
         """First keyword detection should pass through."""
-        result = InferenceResult(
-            task="kws", label="hey_computer", confidence=0.95
-        )
+        result = InferenceResult(task="kws", label="hey_computer", confidence=0.95)
         assert agg.should_emit(result)
 
     def test_kws_cooldown(self, agg):
         """Same keyword within cooldown should be suppressed."""
-        result = InferenceResult(
-            task="kws", label="hey_computer", confidence=0.95
-        )
+        result = InferenceResult(task="kws", label="hey_computer", confidence=0.95)
         agg.should_emit(result)  # First fire
         # Immediate repeat should be suppressed
         assert not agg.should_emit(result)
@@ -126,16 +121,12 @@ class TestEventAggregator:
 
     def test_no_keyword_filtered(self, agg):
         """no_keyword results should always be suppressed."""
-        result = InferenceResult(
-            task="kws", label="no_keyword", confidence=0.1
-        )
+        result = InferenceResult(task="kws", label="no_keyword", confidence=0.1)
         assert not agg.should_emit(result)
 
     def test_vad_always_passes(self, agg):
         """VAD state changes should always pass through."""
-        result = InferenceResult(
-            task="vad", label="speech", confidence=0.9
-        )
+        result = InferenceResult(task="vad", label="speech", confidence=0.9)
         assert agg.should_emit(result)
 
     def test_sed_cooldown(self, agg):

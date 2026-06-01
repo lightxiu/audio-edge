@@ -1,7 +1,6 @@
 """Audio device enumeration and selection utilities."""
 
 from dataclasses import dataclass
-from typing import Optional
 
 import sounddevice as sd
 
@@ -46,7 +45,7 @@ def list_input_devices() -> list[AudioDevice]:
     return devices
 
 
-def find_device(identifier: str | int | None = None) -> Optional[AudioDevice]:
+def find_device(identifier: str | int | None = None) -> AudioDevice | None:
     """Find an audio input device by name substring or index.
 
     Args:
@@ -82,7 +81,7 @@ def find_device(identifier: str | int | None = None) -> Optional[AudioDevice]:
     return None
 
 
-def _device_from_index(index: int) -> Optional[AudioDevice]:
+def _device_from_index(index: int) -> AudioDevice | None:
     """Get AudioDevice by index, returning None if invalid."""
     try:
         dev = sd.query_devices(index)

@@ -14,7 +14,6 @@ import hashlib
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from src.utils.logging import get_logger
 
@@ -34,7 +33,7 @@ class ModelInfo:
     name: str  # Human-readable name
     local_path: str  # Relative path under models/
     url: str  # Download URL
-    sha256: Optional[str] = None  # Expected SHA256 (None = skip verification)
+    sha256: str | None = None  # Expected SHA256 (None = skip verification)
     description: str = ""
     license: str = ""
 
@@ -107,8 +106,7 @@ def download_model(info: ModelInfo, models_dir: str | Path = MODEL_DIR) -> Path:
 
     if not info.url:
         raise ValueError(
-            f"No download URL for {info.name}. "
-            f"This model must be obtained manually or via a specialized script."
+            f"No download URL for {info.name}. This model must be obtained manually or via a specialized script."
         )
 
     logger.info(f"Downloading {info.name} ({info.license})...")

@@ -8,7 +8,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
@@ -94,8 +94,7 @@ class BaseModel(ABC):
 
         if not self._model_path.exists():
             raise FileNotFoundError(
-                f"Model file not found: {self._model_path}. "
-                f"Run `python scripts/download_models.py` first."
+                f"Model file not found: {self._model_path}. Run `python scripts/download_models.py` first."
             )
 
         logger.info(f"Loading {self.task_name} model from {self._model_path} (backend={self._backend})")
@@ -148,12 +147,6 @@ class BaseModel(ABC):
             ValueError: If audio format is incorrect.
         """
         if audio.ndim != 1:
-            raise ValueError(
-                f"Expected 1-D audio array, got shape {audio.shape}. "
-                f"Use audio.squeeze() for mono input."
-            )
+            raise ValueError(f"Expected 1-D audio array, got shape {audio.shape}. Use audio.squeeze() for mono input.")
         if audio.dtype != np.float32:
-            raise ValueError(
-                f"Expected float32 audio, got {audio.dtype}. "
-                f"Use audio.astype(np.float32)."
-            )
+            raise ValueError(f"Expected float32 audio, got {audio.dtype}. Use audio.astype(np.float32).")

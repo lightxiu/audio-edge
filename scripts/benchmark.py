@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import numpy as np
 
-from src.utils.logging import setup_logging, get_logger
+from src.utils.logging import get_logger, setup_logging
 from src.utils.metrics import MetricsCollector
 
 logger = get_logger(__name__)
@@ -180,9 +180,9 @@ def main():
             results[name] = {"error": str(e)}
 
     # Summary table
-    logger.info(f"\n{'='*50}")
+    logger.info(f"\n{'=' * 50}")
     logger.info("Summary")
-    logger.info(f"{'='*50}")
+    logger.info(f"{'=' * 50}")
     for name, stats in results.items():
         if "error" not in stats:
             logger.info(

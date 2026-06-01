@@ -9,8 +9,8 @@ import numpy as np
 import pytest
 
 from src.features.mel import (
-    MelSpectrogram,
     MFCC,
+    MelSpectrogram,
     compute_mel_spectrogram,
     compute_mfcc,
     mel_filter_bank,
@@ -38,9 +38,7 @@ class TestMelFilterBank:
         assert np.all(np.sum(filters, axis=1) > 0)
 
     def test_custom_frequencies(self):
-        filters = mel_filter_bank(
-            n_mels=32, n_fft=1024, sample_rate=16000, f_min=100, f_max=4000
-        )
+        filters = mel_filter_bank(n_mels=32, n_fft=1024, sample_rate=16000, f_min=100, f_max=4000)
         assert filters.shape == (32, 513)
 
 
@@ -127,8 +125,7 @@ class TestSileroVAD:
         """Skip all VAD tests if model is not available."""
         if not MODEL_PATH.exists():
             pytest.skip(
-                f"Silero VAD model not found at {MODEL_PATH}. "
-                "Run `python scripts/download_models.py` to download it."
+                f"Silero VAD model not found at {MODEL_PATH}. Run `python scripts/download_models.py` to download it."
             )
 
     def test_load(self):

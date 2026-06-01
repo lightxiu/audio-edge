@@ -1,8 +1,6 @@
 """Console output backend with rich formatting."""
 
-import sys
 import time
-from typing import Optional
 
 from src.models.base import InferenceResult
 from src.utils.logging import get_logger
@@ -59,9 +57,7 @@ class ConsoleOutput:
                     f"({result.confidence:.2f})"
                 )
             else:
-                line = (
-                    f"[{elapsed:7.2f}s] VAD: {result.label} ({result.confidence:.2f})"
-                )
+                line = f"[{elapsed:7.2f}s] VAD: {result.label} ({result.confidence:.2f})"
         elif result.task == "kws":
             if result.label == "no_keyword":
                 return  # Don't spam for no-keyword
@@ -83,10 +79,7 @@ class ConsoleOutput:
                 f"⏱ {result.latency_ms:.1f}ms{reset}"
             )
         else:
-            line = (
-                f"[{elapsed:7.2f}s] {result.task}: "
-                f"{result.label} ({result.confidence:.2f})"
-            )
+            line = f"[{elapsed:7.2f}s] {result.task}: {result.label} ({result.confidence:.2f})"
 
         print(line, flush=True)
 

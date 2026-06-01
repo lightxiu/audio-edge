@@ -18,6 +18,7 @@ def sample_rate() -> int:
 def silence_audio(sample_rate: int):
     """Generate 1 second of silence."""
     import numpy as np
+
     return np.zeros((sample_rate, 1), dtype=np.float32)
 
 
@@ -25,6 +26,7 @@ def silence_audio(sample_rate: int):
 def sine_audio(sample_rate: int):
     """Generate 1 second of 440 Hz sine wave."""
     import numpy as np
+
     t = np.linspace(0, 1.0, sample_rate, endpoint=False)
     audio = np.sin(2 * np.pi * 440.0 * t).astype(np.float32)
     return audio.reshape(-1, 1)

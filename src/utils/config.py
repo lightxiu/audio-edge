@@ -1,7 +1,7 @@
 """Configuration management using OmegaConf / YAML."""
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 
@@ -70,7 +70,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
 }
 
 
-def load_config(config_path: Optional[str | Path] = None) -> dict[str, Any]:
+def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
     """Load configuration from a YAML file, merging with defaults.
 
     Args:
@@ -114,6 +114,7 @@ def save_config(config: dict[str, Any], path: str | Path) -> None:
 def _deep_copy(d: dict) -> dict:
     """Simple deep copy via YAML round-trip (handles nested dicts/lists cleanly)."""
     import copy
+
     return copy.deepcopy(d)
 
 

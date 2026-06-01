@@ -40,13 +40,13 @@ def main():
         device=args.device,
     )
 
-    print(f"\n{'='*60}")
-    print(f"Audio Capture Test")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print("Audio Capture Test")
+    print(f"{'=' * 60}")
     print(f"Device: {capture.device_name}")
     print(f"Sample Rate: {capture.sample_rate} Hz")
     print(f"Mode: {'MOCK (silence)' if args.mock else 'LIVE'}")
-    print(f"Press Ctrl+C to stop.\n")
+    print("Press Ctrl+C to stop.\n")
 
     capture.start()
 

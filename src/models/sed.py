@@ -8,7 +8,6 @@ License: Apache 2.0
 """
 
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -51,7 +50,7 @@ class MockSED(BaseModel):
     Returns random environmental sound events at low frequency.
     """
 
-    def __init__(self, classes: Optional[list[str]] = None, **kwargs):
+    def __init__(self, classes: list[str] | None = None, **kwargs):
         super().__init__(model_path="mock", backend="mock", use_gpu=False)
         self._classes = classes or DEFAULT_SED_CLASSES[:10]
         self._rng = np.random.RandomState(43)
@@ -114,7 +113,7 @@ class YAMNetSED(BaseModel):
         model_path: str | Path = "models/sed/yamnet.onnx",
         labels_path: str | Path = "models/sed/yamnet_class_map.csv",
         threshold: float = 0.3,
-        target_classes: Optional[list[str]] = None,
+        target_classes: list[str] | None = None,
         **kwargs,
     ):
         """Initialize YAMNet SED.
@@ -186,11 +185,7 @@ class YAMNetSED(BaseModel):
 
         # Filter to target classes
         if self._target_classes:
-            self._target_indices = [
-                idx
-                for idx, name in self._labels.items()
-                if name in self._target_classes
-            ]
+            self._target_indices = [idx for idx, name in self._labels.items() if name in self._target_classes]
             logger.info(f"Filtered to {len(self._target_indices)} target classes")
 
         logger.info(f"YAMNet SED loaded: {len(self._labels)} classes")

@@ -110,7 +110,6 @@ class RingBuffer:
             result = self._buffer[idx:end].copy()
         else:
             # Wraps around
-            first_part = self._capacity - idx
             result = np.concatenate(
                 [self._buffer[idx:], self._buffer[: end - self._capacity]],
                 axis=0,

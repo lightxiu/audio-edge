@@ -7,7 +7,6 @@ Supports ONNX Runtime inference with mock fallback for development.
 """
 
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -42,7 +41,7 @@ class MockASC(BaseModel):
     Cycles through scenes with low frequency changes.
     """
 
-    def __init__(self, scenes: Optional[list[str]] = None, **kwargs):
+    def __init__(self, scenes: list[str] | None = None, **kwargs):
         super().__init__(model_path="mock", backend="mock", use_gpu=False)
         self._scenes = scenes or DEFAULT_SCENE_LABELS[:5]
         self._current_scene = "Indoor"
@@ -140,10 +139,7 @@ class ASTSceneClassifier(BaseModel):
             return
 
         if not self._model_path.exists():
-            logger.warning(
-                f"AST model not found at {self._model_path}. "
-                "Falling back to MockASC."
-            )
+            logger.warning(f"AST model not found at {self._model_path}. Falling back to MockASC.")
             self._is_loaded = True
             return
 
@@ -167,7 +163,7 @@ class ASTSceneClassifier(BaseModel):
             logger.info(f"Loaded {len(self._labels)} scene labels")
         else:
             self._labels = DEFAULT_SCENE_LABELS
-            logger.warning(f"Scene labels not found, using defaults")
+            logger.warning("Scene labels not found, using defaults")
 
         logger.info(f"AST scene classifier loaded: {len(self._labels)} scenes")
 

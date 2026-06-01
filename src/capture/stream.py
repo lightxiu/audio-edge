@@ -5,8 +5,6 @@ The capture runs in a high-priority thread managed by PortAudio internally.
 """
 
 import threading
-from collections.abc import Callable
-from typing import Optional
 
 import numpy as np
 import sounddevice as sd
@@ -58,7 +56,7 @@ class AudioCapture:
         self._dtype = dtype
 
         # Resolve device
-        self._device_info: Optional[AudioDevice] = find_device(device)
+        self._device_info: AudioDevice | None = find_device(device)
         if self._device_info is None and device is not None:
             logger.warning(f"Device '{device}' not found, using default")
 
@@ -71,7 +69,7 @@ class AudioCapture:
         )
 
         # Stream handle
-        self._stream: Optional[sd.InputStream] = None
+        self._stream: sd.InputStream | None = None
         self._is_running = threading.Event()
 
     @property
@@ -176,7 +174,7 @@ class MockAudioCapture(AudioCapture):
 
     def __init__(self, sample_rate: int = 16000, **kwargs):
         super().__init__(sample_rate=sample_rate, **kwargs)
-        self._mock_thread: Optional[threading.Thread] = None
+        self._mock_thread: threading.Thread | None = None
         self._mock_stop = threading.Event()
 
     def start(self) -> None:

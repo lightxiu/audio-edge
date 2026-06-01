@@ -5,9 +5,8 @@ Each line is a complete JSON object representing one event.
 """
 
 import json
-import time
 from pathlib import Path
-from typing import Optional, TextIO
+from typing import TextIO
 
 from src.models.base import InferenceResult
 from src.utils.logging import get_logger
@@ -25,7 +24,7 @@ class JSONLOutput:
             path: Path to the JSONL file.
         """
         self._path = Path(path)
-        self._file: Optional[TextIO] = None
+        self._file: TextIO | None = None
         self._event_count = 0
 
     def open(self) -> None:
@@ -60,7 +59,8 @@ class JSONLOutput:
         # Include metadata if present
         if result.metadata:
             record["metadata"] = {
-                k: v for k, v in result.metadata.items()
+                k: v
+                for k, v in result.metadata.items()
                 if isinstance(v, (str, int, float, bool, list, dict, type(None)))
             }
 

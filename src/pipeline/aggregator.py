@@ -4,7 +4,6 @@ Prevents event storms by applying cooldown windows and hysteresis.
 """
 
 import time
-from collections import defaultdict
 from dataclasses import dataclass, field
 
 from src.models.base import InferenceResult

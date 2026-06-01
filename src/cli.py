@@ -10,7 +10,6 @@ Usage:
 import signal
 import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -26,15 +25,11 @@ app = typer.Typer(
 
 @app.command()
 def run(
-    config_path: Optional[Path] = typer.Option(
+    config_path: Path | None = typer.Option(  # noqa: B008
         None, "--config", "-c", help="Path to YAML config file"
     ),
-    mock: bool = typer.Option(
-        False, "--mock/--no-mock", help="Use mock audio capture (silence generator)"
-    ),
-    duration: float = typer.Option(
-        0, "--duration", "-d", help="Run for N seconds (0 = until Ctrl+C)"
-    ),
+    mock: bool = typer.Option(False, "--mock/--no-mock", help="Use mock audio capture (silence generator)"),
+    duration: float = typer.Option(0, "--duration", "-d", help="Run for N seconds (0 = until Ctrl+C)"),
 ):
     """Run the audio-edge inference pipeline."""
     # Load config
@@ -89,7 +84,7 @@ def list_devices():
 
 @app.command()
 def test_audio(
-    device: Optional[str] = typer.Option(None, "--device", "-d", help="Audio device name"),
+    device: str | None = typer.Option(None, "--device", "-d", help="Audio device name"),
     sample_rate: int = typer.Option(16000, "--sample-rate", "-r", help="Sample rate in Hz"),
     duration: float = typer.Option(0, "--duration", "-t", help="Duration in seconds (0=until Ctrl+C)"),
     mock: bool = typer.Option(False, "--mock", help="Use mock capture (silence)"),
@@ -104,11 +99,11 @@ def test_audio(
     capture_cls = MockAudioCapture if mock else AudioCapture
     capture = capture_cls(sample_rate=sample_rate, device=device)
 
-    typer.echo(f"\nAudio Capture Test")
+    typer.echo("\nAudio Capture Test")
     typer.echo(f"  Device: {capture.device_name}")
     typer.echo(f"  Sample Rate: {capture.sample_rate} Hz")
     typer.echo(f"  Mode: {'MOCK' if mock else 'LIVE'}")
-    typer.echo(f"  Press Ctrl+C to stop.\n")
+    typer.echo("  Press Ctrl+C to stop.\n")
 
     capture.start()
     start_time = time.time()

@@ -10,18 +10,15 @@ Thread model:
   - Main thread:     Event loop, keyboard interrupt handling
 """
 
-import signal
 import threading
 import time
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
-from src.capture.ring_buffer import RingBuffer
 from src.capture.stream import AudioCapture, MockAudioCapture
+from src.models.asc import ASTSceneClassifier, MockASC
 from src.models.base import InferenceResult
-from src.models.asc import MockASC, ASTSceneClassifier
 from src.models.kws import MockKWS, SherpaKWS
 from src.models.sed import MockSED, YAMNetSED
 from src.models.vad import SileroVAD
@@ -305,7 +302,7 @@ class Orchestrator:
                 try:
                     result = self._vad.infer(audio_chunk)
                     was_speech = self._is_speech
-                    self._is_speech = (result.label == "speech")
+                    self._is_speech = result.label == "speech"
 
                     if was_speech != self._is_speech:
                         speech_changed = True
@@ -371,7 +368,7 @@ class Orchestrator:
                 except Exception as e:
                     logger.error(f"SED error: {e}")
                 self._scheduler.mark_run("sed")
-                sed_buf = sed_buf[sed_window // 2:]  # 50% overlap
+                sed_buf = sed_buf[sed_window // 2 :]  # 50% overlap
 
             # --- ASC Inference (every ~3s) ---
             if self._asc and len(asc_buf) >= asc_window and self._scheduler.is_due("asc"):
@@ -381,7 +378,7 @@ class Orchestrator:
                 except Exception as e:
                     logger.error(f"ASC error: {e}")
                 self._scheduler.mark_run("asc")
-                asc_buf = asc_buf[asc_window // 2:]  # 50% overlap
+                asc_buf = asc_buf[asc_window // 2 :]  # 50% overlap
 
             # Limit buffer growth
             max_buf = max(sed_window, asc_window) * 2

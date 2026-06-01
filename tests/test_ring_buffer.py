@@ -1,7 +1,6 @@
 """Tests for the lock-free ring buffer."""
 
 import numpy as np
-import pytest
 
 from src.capture.ring_buffer import RingBuffer
 

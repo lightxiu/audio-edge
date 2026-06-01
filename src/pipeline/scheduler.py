@@ -97,11 +97,7 @@ class Scheduler:
         Returns:
             List of task names.
         """
-        return [
-            name
-            for name in self.tasks
-            if self.is_due(name, speech_active)
-        ]
+        return [name for name in self.tasks if self.is_due(name, speech_active)]
 
     def reset(self) -> None:
         """Reset all task timers."""

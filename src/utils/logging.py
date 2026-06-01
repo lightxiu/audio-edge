@@ -2,7 +2,6 @@
 
 import sys
 from pathlib import Path
-from typing import Optional
 
 from loguru import logger
 
@@ -10,7 +9,7 @@ from loguru import logger
 def setup_logging(
     level: str = "INFO",
     fmt: str = "text",
-    log_file: Optional[str | Path] = None,
+    log_file: str | Path | None = None,
 ) -> None:
     """Configure loguru logging.
 

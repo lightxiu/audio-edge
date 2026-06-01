@@ -9,7 +9,6 @@ License: Apache 2.0
 """
 
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -28,7 +27,7 @@ class MockKWS(BaseModel):
     developing and testing the orchestrator on machines without sherpa-onnx.
     """
 
-    def __init__(self, keywords: Optional[list[str]] = None, **kwargs):
+    def __init__(self, keywords: list[str] | None = None, **kwargs):
         super().__init__(model_path="mock", backend="mock", use_gpu=False)
         self._keywords = keywords or ["hey_computer", "stop", "go"]
         self._rng = np.random.RandomState(42)
@@ -99,7 +98,7 @@ class SherpaKWS(BaseModel):
     def __init__(
         self,
         model_dir: str | Path = "models/kws",
-        keywords: Optional[list[str]] = None,
+        keywords: list[str] | None = None,
         backend: str = "onnx",
         use_gpu: bool = True,
     ):
@@ -114,8 +113,8 @@ class SherpaKWS(BaseModel):
         """
         super().__init__(model_path=model_dir, backend=backend, use_gpu=use_gpu)
         self._keywords = keywords or ["hey_computer", "stop", "go"]
-        self._spotter: Optional[object] = None
-        self._stream: Optional[object] = None
+        self._spotter: object | None = None
+        self._stream: object | None = None
         self._has_sherpa = False
 
     @property
@@ -143,11 +142,11 @@ class SherpaKWS(BaseModel):
         """Load the sherpa-onnx KWS model."""
         try:
             import sherpa_onnx
+
             self._has_sherpa = True
         except ImportError:
             logger.warning(
-                "sherpa-onnx not installed. KWS will fall back to mock. "
-                "Install with: pip install sherpa-onnx"
+                "sherpa-onnx not installed. KWS will fall back to mock. Install with: pip install sherpa-onnx"
             )
             self._has_sherpa = False
             self._is_loaded = True
@@ -187,10 +186,7 @@ class SherpaKWS(BaseModel):
         self._spotter = sherpa_onnx.KeywordSpotter(config)
         self._stream = self._spotter.create_stream()
 
-        logger.info(
-            f"sherpa-onnx KWS loaded: {len(self._keywords)} keywords "
-            f"({', '.join(self._keywords[:5])}...)"
-        )
+        logger.info(f"sherpa-onnx KWS loaded: {len(self._keywords)} keywords ({', '.join(self._keywords[:5])}...)")
 
     def _infer(self, audio: np.ndarray) -> InferenceResult:
         """Run KWS inference on audio chunk.

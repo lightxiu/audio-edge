@@ -76,15 +76,11 @@ def mel_filter_bank(
 
         # Rising slope
         if f_center > f_start:
-            filters[m, f_start:f_center] = (
-                np.arange(f_start, f_center) - f_start
-            ) / (f_center - f_start)
+            filters[m, f_start:f_center] = (np.arange(f_start, f_center) - f_start) / (f_center - f_start)
 
         # Falling slope
         if f_end > f_center:
-            filters[m, f_center:f_end] = (
-                f_end - np.arange(f_center, f_end)
-            ) / (f_end - f_center)
+            filters[m, f_center:f_end] = (f_end - np.arange(f_center, f_end)) / (f_end - f_center)
 
     return filters
 

@@ -9,7 +9,6 @@ License: MIT
 
 from collections.abc import Generator
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -60,8 +59,8 @@ class SileroVAD(BaseModel):
         """
         super().__init__(model_path=model_path, backend=backend, use_gpu=use_gpu)
         self._threshold = threshold
-        self._state: Optional[np.ndarray] = None
-        self._sample_rate_tensor: Optional[np.ndarray] = None
+        self._state: np.ndarray | None = None
+        self._sample_rate_tensor: np.ndarray | None = None
 
     @property
     def sample_rate(self) -> int:
@@ -104,7 +103,6 @@ class SileroVAD(BaseModel):
         # Store input/output names by ACTUAL name (not position)
         # Silero VAD ONNX inputs: input(float), state(float), sr(int64)
         input_names = [inp.name for inp in self._model.get_inputs()]
-        output_names = [out.name for out in self._model.get_outputs()]
 
         self._input_name = "input"
         self._state_name = "state"
@@ -115,26 +113,17 @@ class SileroVAD(BaseModel):
         # Verify all expected names exist
         for name in [self._input_name, self._state_name, self._sr_name]:
             if name not in input_names:
-                raise RuntimeError(
-                    f"Expected input '{name}' not found in model. "
-                    f"Available inputs: {input_names}"
-                )
+                raise RuntimeError(f"Expected input '{name}' not found in model. Available inputs: {input_names}")
 
         # Create initial RNN state: shape [2, 1, 128]
         # The model uses a 2-layer GRU with 128 hidden units.
         # ONNX reports dynamic dims as None/strings — map to concrete values.
         raw_shape = self._model.get_inputs()[1].shape  # e.g. [2, None, 128]
-        state_shape = tuple(
-            1 if (d is None or isinstance(d, str)) else d
-            for d in raw_shape
-        )
+        state_shape = tuple(1 if (d is None or isinstance(d, str)) else d for d in raw_shape)
         self._init_state = np.zeros(state_shape, dtype=np.float32)
         self._state = self._init_state.copy()
 
-        logger.debug(
-            f"Silero VAD loaded: inputs={input_names}, "
-            f"state_shape={state_shape}, providers={providers}"
-        )
+        logger.debug(f"Silero VAD loaded: inputs={input_names}, state_shape={state_shape}, providers={providers}")
 
     def _infer(self, audio: np.ndarray) -> InferenceResult:
         """Run VAD inference on a single audio chunk.
@@ -227,9 +216,7 @@ class SileroVAD(BaseModel):
 
         # Find speech segments using hysteresis
         speech_mask = np.array([p >= self._threshold for p in probs], dtype=bool)
-        segments = self._hysteresis_segmentation(
-            speech_mask, min_speech_frames, min_silence_frames
-        )
+        segments = self._hysteresis_segmentation(speech_mask, min_speech_frames, min_silence_frames)
 
         for start_frame, end_frame in segments:
             start_sample = max(0, start_frame * stride - pad_samples)

@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.utils.logging import setup_logging, get_logger
+from src.utils.logging import get_logger, setup_logging
 
 logger = get_logger(__name__)
 
@@ -85,8 +85,7 @@ def build_trt_engine(
         import tensorrt as trt
     except ImportError:
         logger.error(
-            "TensorRT Python bindings not found. "
-            "Ensure JetPack is installed: sudo apt install python3-libnvinfer"
+            "TensorRT Python bindings not found. Ensure JetPack is installed: sudo apt install python3-libnvinfer"
         )
         return False
 
@@ -141,6 +140,7 @@ def build_trt_engine(
 
     # Build engine
     import time
+
     t0 = time.time()
     serialized_engine = builder.build_serialized_network(network, config)
     build_time = time.time() - t0

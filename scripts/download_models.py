@@ -16,9 +16,8 @@ from src.models.model_loader import (
     MODEL_DIR,
     MODEL_REGISTRY,
     OPTIONAL_MODELS,
-    ModelInfo,
-    download_model,
     download_all,
+    download_model,
 )
 from src.utils.logging import setup_logging
 
@@ -40,7 +39,7 @@ def cmd_list() -> None:
         print(f"  {status} {m.name}")
         print(f"    Path:     {m.local_path}")
         print(f"    License:  {m.license}")
-        print(f"    Note:     Must be obtained manually or via specialized script")
+        print("    Note:     Must be obtained manually or via specialized script")
         print()
 
 
