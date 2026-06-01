@@ -1,0 +1,19 @@
+# Jetson Orin NX TensorRT-optimized configuration
+# Requires: JetPack with TensorRT, ONNX models built to TRT engines.
+
+extends: default
+
+inference:
+  backend: tensorrt
+  trt_engine_dir: models/engines
+  use_gpu: true
+
+logging:
+  level: INFO
+  format: text
+  file: logs/audio-edge.log
+
+# Jetson-specific audio: use the USB sound card
+# Run `python scripts/list_devices.py` to find the device name
+audio:
+  device: null  # Change to your USB device name, e.g., "USB Audio Device"

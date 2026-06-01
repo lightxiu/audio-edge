@@ -1,0 +1,57 @@
+# audio-edge default configuration
+# This config works out-of-the-box with ONNX Runtime on any platform.
+
+audio:
+  sample_rate: 16000
+  channels: 1
+  block_size: 480        # 30ms @ 16kHz
+  buffer_duration_sec: 3.0
+  device: null           # null = system default input device
+
+vad:
+  enabled: true
+  model_path: models/vad/silero_vad.onnx
+  threshold: 0.5
+  min_speech_duration_ms: 250
+  min_silence_duration_ms: 300
+  speech_pad_ms: 200
+
+kws:
+  enabled: true
+  model_path: models/kws/sherpa-kws.onnx
+  keywords_path: models/kws/keywords.txt
+  window_sec: 1.0
+  stride_sec: 0.1
+  cooldown_sec: 1.5
+
+sed:
+  enabled: true
+  model_path: models/sed/yamnet.onnx
+  labels_path: models/sed/yamnet_class_map.csv
+  interval_sec: 1.0
+  threshold: 0.3
+  target_classes: []     # [] = all 521 AudioSet classes
+
+asc:
+  enabled: true
+  model_path: models/asc/ast-finetuned.onnx
+  labels_path: models/asc/scene_labels.txt
+  interval_sec: 2.0
+  min_duration_sec: 2.0
+
+inference:
+  backend: onnx          # "onnx" or "tensorrt"
+  trt_engine_dir: models/engines
+  num_workers: 3
+  use_gpu: true
+
+output:
+  console: true
+  jsonl_path: null       # null = disabled, "logs/events.jsonl" to enable
+  mqtt_broker: null      # null = disabled
+  mqtt_topic: audio-edge/events
+
+logging:
+  level: INFO
+  format: text            # "text" or "json"
+  file: null

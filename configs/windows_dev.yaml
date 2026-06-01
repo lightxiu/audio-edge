@@ -1,0 +1,17 @@
+# Windows development configuration
+# Uses ONNX Runtime (no TensorRT on Windows), verbose logging.
+
+extends: default
+
+audio:
+  # On Windows without a mic, set device to null for default or use a specific name
+  device: null
+
+inference:
+  backend: onnx           # TensorRT not available on Windows
+  use_gpu: true           # GPU ONNX Runtime if CUDA available
+
+logging:
+  level: DEBUG
+  format: text
+  file: logs/audio-edge.log  # Persist logs for debugging
