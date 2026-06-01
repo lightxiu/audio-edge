@@ -21,7 +21,9 @@ import numpy as np
 from src.capture.ring_buffer import RingBuffer
 from src.capture.stream import AudioCapture, MockAudioCapture
 from src.models.base import InferenceResult
+from src.models.asc import MockASC, ASTSceneClassifier
 from src.models.kws import MockKWS, SherpaKWS
+from src.models.sed import MockSED, YAMNetSED
 from src.models.vad import SileroVAD
 from src.output.console import ConsoleOutput
 from src.output.jsonl import JSONLOutput
@@ -95,6 +97,44 @@ class Orchestrator:
         else:
             self._kws = None
 
+        # --- SED Model ---
+        sed_cfg = config["sed"]
+        if sed_cfg["enabled"]:
+            sed_model_path = Path(sed_cfg["model_path"])
+            if sed_model_path.exists():
+                self._sed = YAMNetSED(
+                    model_path=sed_cfg["model_path"],
+                    labels_path=sed_cfg.get("labels_path", ""),
+                    threshold=sed_cfg["threshold"],
+                    target_classes=sed_cfg.get("target_classes", []),
+                    backend=config["inference"]["backend"],
+                    use_gpu=config["inference"]["use_gpu"],
+                )
+            else:
+                logger.info("YAMNet SED model not found, using mock SED")
+                self._sed = MockSED()
+        else:
+            self._sed = None
+
+        # --- ASC Model ---
+        asc_cfg = config["asc"]
+        if asc_cfg["enabled"]:
+            asc_model_path = Path(asc_cfg["model_path"])
+            if asc_model_path.exists():
+                self._asc = ASTSceneClassifier(
+                    model_path=asc_cfg["model_path"],
+                    labels_path=asc_cfg.get("labels_path", ""),
+                    threshold=0.5,
+                    min_duration_sec=asc_cfg.get("min_duration_sec", 2.0),
+                    backend=config["inference"]["backend"],
+                    use_gpu=config["inference"]["use_gpu"],
+                )
+            else:
+                logger.info("AST model not found, using mock ASC")
+                self._asc = MockASC()
+        else:
+            self._asc = None
+
         # --- Scheduler ---
         self._scheduler = Scheduler()
         if kws_cfg["enabled"]:
@@ -155,6 +195,10 @@ class Orchestrator:
             self._vad.load()
         if self._kws:
             self._kws.load()
+        if self._sed:
+            self._sed.load()
+        if self._asc:
+            self._asc.load()
 
         # Start audio capture
         self._capture.start()
@@ -169,6 +213,16 @@ class Orchestrator:
             )
             vad_thread.start()
             self._threads.append(vad_thread)
+
+        # Start background inference thread (SED + ASC)
+        if self._sed or self._asc:
+            bg_thread = threading.Thread(
+                target=self._background_loop,
+                name="background-inference",
+                daemon=True,
+            )
+            bg_thread.start()
+            self._threads.append(bg_thread)
 
     def stop(self) -> None:
         """Stop all sub-systems gracefully."""
@@ -187,6 +241,10 @@ class Orchestrator:
             self._vad.unload()
         if self._kws:
             self._kws.unload()
+        if self._sed:
+            self._sed.unload()
+        if self._asc:
+            self._asc.unload()
 
         # Close outputs
         for out in self._outputs:
@@ -276,9 +334,63 @@ class Orchestrator:
             self._scheduler.mark_run("kws")
 
     def _run_inference_background(self) -> None:
-        """Run background inference tasks (SED, ASC) regardless of speech."""
-        # These will be implemented in Phase 4
-        pass
+        """Run background inference tasks (SED, ASC) regardless of speech.
+
+        SED runs every ~1s, ASC every ~2-3s. Audio is accumulated in a
+        separate buffer in the background loop thread.
+        """
+        pass  # Handled by _background_loop thread
+
+    def _background_loop(self) -> None:
+        """Background inference thread for SED and ASC tasks.
+
+        Accumulates audio into longer windows and runs inference
+        at configured intervals, independent of speech activity.
+        """
+        sed_buf = np.zeros((0,), dtype=np.float32)
+        asc_buf = np.zeros((0,), dtype=np.float32)
+
+        sed_window = int(self._sample_rate * 1.0)  # 1 second for SED
+        asc_window = int(self._sample_rate * 3.0)  # 3 seconds for ASC
+
+        while self._running.is_set():
+            # Read available audio
+            available = self._capture.available
+            if available > 0:
+                chunk = self._capture.read(min(available, 512)).squeeze()
+                if len(chunk) > 0:
+                    sed_buf = np.concatenate([sed_buf, chunk])
+                    asc_buf = np.concatenate([asc_buf, chunk])
+
+            # --- SED Inference (every ~1s) ---
+            if self._sed and len(sed_buf) >= sed_window and self._scheduler.is_due("sed"):
+                try:
+                    result = self._sed.infer(sed_buf[:sed_window])
+                    if result.label != "Silence":
+                        self._emit(result)
+                except Exception as e:
+                    logger.error(f"SED error: {e}")
+                self._scheduler.mark_run("sed")
+                sed_buf = sed_buf[sed_window // 2:]  # 50% overlap
+
+            # --- ASC Inference (every ~3s) ---
+            if self._asc and len(asc_buf) >= asc_window and self._scheduler.is_due("asc"):
+                try:
+                    result = self._asc.infer(asc_buf[:asc_window])
+                    self._emit(result)
+                except Exception as e:
+                    logger.error(f"ASC error: {e}")
+                self._scheduler.mark_run("asc")
+                asc_buf = asc_buf[asc_window // 2:]  # 50% overlap
+
+            # Limit buffer growth
+            max_buf = max(sed_window, asc_window) * 2
+            if len(sed_buf) > max_buf:
+                sed_buf = sed_buf[-max_buf:]
+            if len(asc_buf) > max_buf:
+                asc_buf = asc_buf[-max_buf:]
+
+            time.sleep(0.05)  # 50ms polling
 
     def _emit(self, result: InferenceResult) -> None:
         """Filter through aggregator and send to all outputs."""
