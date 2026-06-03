@@ -29,7 +29,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     },
     "kws": {
         "enabled": True,
-        "model_path": "models/kws/sherpa-kws.onnx",
+        "model_path": "models/kws",
         "keywords_path": "models/kws/keywords.txt",
         "window_sec": 1.0,
         "stride_sec": 0.1,

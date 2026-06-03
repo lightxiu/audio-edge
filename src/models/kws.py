@@ -121,14 +121,11 @@ class SherpaKWS(BaseModel):
             logger.debug("KWS stream reset")
 
     def _load_model(self) -> None:
-        """Load the sherpa-onnx KWS model."""
         try:
-            import sherpa_onnx
-
+            import sherpa_onnx  # noqa: F401
             self._has_sherpa = True
         except ImportError:
             logger.warning("sherpa-onnx not installed, falling back to mock KWS")
-
             self._has_sherpa = False
             self._is_loaded = True
             return
@@ -143,25 +140,20 @@ class SherpaKWS(BaseModel):
             if not Path(f).exists():
                 raise FileNotFoundError(f"KWS model file not found: {f}")
 
-        config = sherpa_onnx.KeywordSpotterConfig(
-            feat_config=sherpa_onnx.FeatureConfig(
-                sample_rate=KWS_SAMPLE_RATE,
-                feature_dim=80,
-            ),
-            model_config=sherpa_onnx.OnlineModelConfig(
-                tokens=tokens,
-                encoder=encoder,
-                decoder=decoder,
-                joiner=joiner,
-            ),
+        import sherpa_onnx
+
+        self._spotter = sherpa_onnx.KeywordSpotter(
+            tokens=tokens,
+            encoder=encoder,
+            decoder=decoder,
+            joiner=joiner,
             keywords_file=str(model_dir / "keywords.txt"),
             num_threads=2,
+            provider="cpu",
         )
-
-        self._spotter = sherpa_onnx.KeywordSpotter(config)
         self._stream = self._spotter.create_stream()
 
-        logger.info(f"sherpa-onnx KWS loaded: {len(self._keywords)} keywords ({', '.join(self._keywords[:5])}...)")
+        logger.info(f"sherpa-onnx KWS loaded: model={model_dir.name}")
 
     def _infer(self, audio: np.ndarray) -> InferenceResult:
         self.validate_audio(audio)
@@ -171,18 +163,20 @@ class SherpaKWS(BaseModel):
             mock._is_loaded = True
             return mock._infer(audio)
 
-        # sherpa-onnx streaming inference
         audio = audio.astype(np.float32)
         self._stream.accept_waveform(KWS_SAMPLE_RATE, audio)
+
+        import sherpa_onnx
 
         while self._spotter.is_ready(self._stream):
             self._spotter.decode_stream(self._stream)
 
-        result_text = self._spotter.get_result(self._stream).keyword
+        result_text = self._spotter.get_result(self._stream)
+        # get_result returns a plain string in sherpa-onnx >= 1.12
 
-        if result_text and result_text in self._keywords:
-            keyword = result_text
-            confidence = 0.95  # sherpa-onnx KWS doesn't expose confidence scores
+        if result_text:
+            keyword = result_text.strip()
+            confidence = 0.95
         else:
             keyword = "no_keyword"
             confidence = 0.0
