@@ -56,25 +56,33 @@ MODEL_REGISTRY: list[ModelInfo] = [
         description="AudioSet class labels (521 classes) for YAMNet",
         license="Apache 2.0",
     ),
-]
-
-# Optional models (downloaded on demand)
-OPTIONAL_MODELS: list[ModelInfo] = [
     ModelInfo(
-        name="sherpa-onnx KWS",
-        local_path="kws/sherpa-kws.onnx",
-        url="",  # Filled at download time via sherpa-onnx API
+        name="YAMNet ONNX",
+        local_path="sed/yamnet.onnx",
+        url="",  # Exported locally via scripts/export_yamnet_onnx.py
         sha256=None,
-        description="Keyword spotting model (Zipformer-based)",
+        description="Sound Event Detection — YAMNet MobileNet-based classifier (521 AudioSet classes)",
         license="Apache 2.0",
     ),
     ModelInfo(
-        name="AST-finetuned-audioset",
+        name="AST-finetuned-audioset ONNX",
         local_path="asc/ast-finetuned.onnx",
-        url="",  # Filled at download time or exported from HF
+        url="",  # Exported locally via scripts/export_ast_onnx.py
         sha256=None,
-        description="Audio Scene Classification — 527-class AudioSet fine-tuned",
+        description="Audio Scene Classification — AST transformer (527 AudioSet classes)",
         license="MIT",
+    ),
+]
+
+# Optional models (require manual setup or specialized export scripts)
+OPTIONAL_MODELS: list[ModelInfo] = [
+    ModelInfo(
+        name="sherpa-onnx KWS (Zipformer)",
+        local_path="kws/encoder.onnx",
+        url="https://www.modelscope.cn/pkufool/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.git",
+        sha256=None,
+        description="Keyword spotting — Zipformer-based model, cloned via git-lfs from ModelScope",
+        license="Apache 2.0",
     ),
 ]
 

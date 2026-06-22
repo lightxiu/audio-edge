@@ -16,7 +16,8 @@ from src.utils.logging import get_logger
 logger = get_logger(__name__)
 
 ASC_SAMPLE_RATE = 16000
-ASC_DURATION_SEC = 3.0
+ASC_DURATION_SEC = 10.0  # AST was trained on ~10s segments
+AST_NUM_MELS = 128
 
 # Common acoustic scene labels
 DEFAULT_SCENE_LABELS = [
@@ -171,7 +172,7 @@ class ASTSceneClassifier(BaseModel):
         """Run ASC inference.
 
         Args:
-            audio: 1-D float32 array at 16kHz, ~3s recommended.
+            audio: 1-D float32 array at 16kHz, ~10s recommended for AST.
 
         Returns:
             InferenceResult with scene label.
@@ -184,28 +185,24 @@ class ASTSceneClassifier(BaseModel):
             mock._is_loaded = True
             return mock._infer(audio)
 
-        # Compute mel spectrogram (AST expects 128 mel bins, ~100 frames)
+        # Compute mel spectrogram matching AST input requirements.
+        # AST expects: (batch, time, freq) = (1, N_frames, 128)
+        # With 16kHz audio, 25ms window (n_fft=400), 10ms hop (hop=160):
+        #   10s → ~1000 frames, which matches AST's 1024-frame pretrained input.
         from src.features.mel import compute_mel_spectrogram
 
         mel = compute_mel_spectrogram(
             audio,
             sample_rate=ASC_SAMPLE_RATE,
-            n_mels=128,
-            n_fft=400,
-            hop_length=160,
+            n_mels=AST_NUM_MELS,
+            n_fft=400,   # 25ms @ 16kHz
+            hop_length=160,  # 10ms @ 16kHz
         )
 
-        # Ensure fixed size (truncate or pad)
-        target_frames = 100
-        features = mel.features
-        if features.shape[1] < target_frames:
-            pad = target_frames - features.shape[1]
-            features = np.pad(features, ((0, 0), (0, pad)), mode="constant")
-        elif features.shape[1] > target_frames:
-            features = features[:, :target_frames]
+        n_frames = mel.features.shape[1]
+        # Transpose: (n_mels, n_frames) → (1, n_frames, n_mels) for AST
+        input_tensor = mel.features.T.astype(np.float32).reshape(1, n_frames, AST_NUM_MELS)
 
-        # Run ONNX inference
-        input_tensor = features.astype(np.float32).reshape(1, 128, target_frames)
         input_name = self._model.get_inputs()[0].name
         scores = self._model.run(None, {input_name: input_tensor})[0].squeeze()
 

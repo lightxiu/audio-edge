@@ -192,16 +192,24 @@ class YAMNetSED(BaseModel):
             mock._is_loaded = True
             return mock._infer(audio)
 
-        mel_spec = self._extract_yamnet_mel(audio)
-        mel_spec = mel_spec.astype(np.float32).reshape(1, 96, 64)
-
         input_name = self._model.get_inputs()[0].name
-        scores, embeddings = self._model.run(None, {input_name: mel_spec})
+
+        # Detect input type: waveform vs mel spectrogram
+        input_shape = self._model.get_inputs()[0].shape
+        if len(input_shape) == 2 or (len(input_shape) == 3 and input_shape[-1] in (1, None)):
+            # Waveform input: feed raw audio directly
+            audio_in = audio.astype(np.float32).reshape(1, -1)
+            scores, embeddings = self._model.run(None, {input_name: audio_in})
+        else:
+            # Mel spectrogram input: pre-compute mel
+            mel_spec = self._extract_yamnet_mel(audio)
+            mel_spec = mel_spec.astype(np.float32).reshape(1, 96, 64)
+            scores, embeddings = self._model.run(None, {input_name: mel_spec})
+
         scores = scores.squeeze()
 
         # Find top class
         if self._target_classes:
-            # Only consider target classes
             indices = self._target_indices
             if not indices:
                 indices = range(len(scores))
