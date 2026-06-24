@@ -107,7 +107,7 @@ class ASTSceneClassifier(BaseModel):
     def __init__(
         self,
         model_path: str | Path = "models/asc/ast-finetuned.onnx",
-        labels_path: str | Path = "models/asc/scene_labels.txt",
+        labels_path: str | Path = "models/asc/audioset_labels.txt",
         threshold: float = 0.5,
         min_duration_sec: float = 2.0,
         **kwargs,
@@ -200,14 +200,36 @@ class ASTSceneClassifier(BaseModel):
         )
 
         n_frames = mel.features.shape[1]
-        # Transpose: (n_mels, n_frames) → (1, n_frames, n_mels) for AST
-        input_tensor = mel.features.T.astype(np.float32).reshape(1, n_frames, AST_NUM_MELS)
+
+        # AST requires exactly 1024 frames (fixed positional embeddings).
+        # Resize by interpolating along the time axis.
+        TARGET_FRAMES = 1024
+        if n_frames != TARGET_FRAMES:
+            import numpy as np
+
+            # Interpolate: (n_mels, n_frames) → (n_mels, 1024)
+            mel_features = mel.features.T  # (n_frames, n_mels)
+            x_old = np.linspace(0, 1, n_frames)
+            x_new = np.linspace(0, 1, TARGET_FRAMES)
+            mel_features = np.array([
+                np.interp(x_new, x_old, mel_features[:, i])
+                for i in range(AST_NUM_MELS)
+            ]).T  # (1024, n_mels)
+        else:
+            mel_features = mel.features.T  # (1024, n_mels)
+
+        # AST expects: (batch, time, freq) = (1, 1024, 128)
+        input_tensor = mel_features.astype(np.float32).reshape(1, TARGET_FRAMES, AST_NUM_MELS)
 
         input_name = self._model.get_inputs()[0].name
-        scores = self._model.run(None, {input_name: input_tensor})[0].squeeze()
+        logits = self._model.run(None, {input_name: input_tensor})[0].squeeze()
 
-        top_idx = int(np.argmax(scores))
-        top_score = float(scores[top_idx])
+        # Apply softmax to convert logits to probabilities
+        logits = logits - logits.max()  # Stabilize
+        probs = np.exp(logits) / np.sum(np.exp(logits))
+
+        top_idx = int(np.argmax(probs))
+        top_score = float(probs[top_idx])
 
         if top_score >= self._threshold and top_idx < len(self._labels):
             label = self._labels[top_idx]

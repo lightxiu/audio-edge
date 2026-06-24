@@ -35,7 +35,7 @@ sed:
 asc:
   enabled: true
   model_path: models/asc/ast-finetuned.onnx
-  labels_path: models/asc/scene_labels.txt
+  labels_path: models/asc/audioset_labels.txt
   interval_sec: 2.0
   min_duration_sec: 2.0
 

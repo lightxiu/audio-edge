@@ -194,19 +194,29 @@ class YAMNetSED(BaseModel):
 
         input_name = self._model.get_inputs()[0].name
 
-        # Detect input type: waveform vs mel spectrogram
+        # Detect input type by rank:
+        #   rank ≤ 2 → waveform (raw audio, 1-D or 2-D with batch)
+        #   rank ≥ 3 → mel spectrogram (batch, frames, mel_bands)
         input_shape = self._model.get_inputs()[0].shape
-        if len(input_shape) == 2 or (len(input_shape) == 3 and input_shape[-1] in (1, None)):
-            # Waveform input: feed raw audio directly
-            audio_in = audio.astype(np.float32).reshape(1, -1)
-            scores, embeddings = self._model.run(None, {input_name: audio_in})
+        if len(input_shape) <= 2:
+            # Waveform model — feed raw audio, request scores first
+            audio_in = audio.astype(np.float32)
+            scores, _embeddings = self._model.run(
+                ["scores", "embeddings"], {input_name: audio_in}
+            )
         else:
-            # Mel spectrogram input: pre-compute mel
+            # Mel spectrogram model — pre-compute mel
             mel_spec = self._extract_yamnet_mel(audio)
             mel_spec = mel_spec.astype(np.float32).reshape(1, 96, 64)
-            scores, embeddings = self._model.run(None, {input_name: mel_spec})
+            scores, _embeddings = self._model.run(
+                ["scores", "embeddings"], {input_name: mel_spec}
+            )
 
         scores = scores.squeeze()
+
+        # Max-pool across frames for per-frame models
+        if scores.ndim > 1:
+            scores = scores.max(axis=0)
 
         # Find top class
         if self._target_classes:

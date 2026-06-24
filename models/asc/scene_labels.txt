@@ -1,0 +1,30 @@
+Indoor
+Outdoor
+Office
+Street
+Cafe/Restaurant
+Home
+Park
+Public transport
+Car
+Market
+Library
+Station
+Airport
+Hospital
+School
+Church
+Factory
+Construction site
+Beach
+Forest
+Urban
+Rural
+Subway
+Bus
+Train
+Bar
+Restaurant
+Shopping mall
+Stadium
+Theater
