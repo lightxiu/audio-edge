@@ -48,6 +48,8 @@ inference:
 output:
   console: true
   jsonl_path: null       # null = disabled, "logs/events.jsonl" to enable
+  dashboard: true         # WebSocket real-time dashboard
+  dashboard_port: 8765
   mqtt_broker: null      # null = disabled
   mqtt_topic: audio-edge/events
 

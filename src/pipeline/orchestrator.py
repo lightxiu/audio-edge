@@ -172,6 +172,14 @@ class Orchestrator:
             jsonl_out.open()
             self._outputs.append(jsonl_out)
 
+        if out_cfg.get("dashboard"):
+            from dashboard.output import DashboardOutput
+
+            dash_out = DashboardOutput(
+                port=out_cfg.get("dashboard_port", 8765),
+            )
+            self._outputs.append(dash_out)
+
         # --- State ---
         self._is_speech = False
         self._vad_buf = np.zeros((0, 1), dtype=np.float32)  # Accumulates for VAD window
