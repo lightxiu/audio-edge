@@ -30,11 +30,16 @@ def run(
     ),
     mock: bool = typer.Option(False, "--mock/--no-mock", help="Use mock audio capture (silence generator)"),
     duration: float = typer.Option(0, "--duration", "-d", help="Run for N seconds (0 = until Ctrl+C)"),
+    report: bool | None = typer.Option(
+        None, "--report/--no-report", help="Generate a local-LLM report when the run ends"
+    ),
 ):
     """Run the audio-edge inference pipeline."""
     # Load config
     cfg = load_config(config_path)
     cfg["_mock_audio"] = mock
+    if report is not None:
+        cfg["report"]["enabled"] = report
 
     # Setup logging
     log_cfg = cfg["logging"]

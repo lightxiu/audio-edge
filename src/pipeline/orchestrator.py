@@ -52,6 +52,8 @@ class Orchestrator:
         self._cfg = config
         self._running = threading.Event()
         self._threads: list[threading.Thread] = []
+        self._report_events: list[dict] = []
+        self._report_generated = False
 
         # --- Audio Capture ---
         audio_cfg = config["audio"]
@@ -251,12 +253,31 @@ class Orchestrator:
         if self._asc:
             self._asc.unload()
 
+        self._write_report()
+
         # Close outputs
         for out in self._outputs:
             if hasattr(out, "close"):
                 out.close()
 
         logger.info("Pipeline stopped.")
+
+    def _write_report(self) -> None:
+        if self._report_generated or not self._cfg.get("report", {}).get("enabled", False):
+            return
+        self._report_generated = True
+        report_cfg = self._cfg["report"]
+        try:
+            from agent.report import EventReportGenerator
+
+            EventReportGenerator(
+                model=report_cfg["model"],
+                base_url=report_cfg["base_url"],
+                output_path=report_cfg["output_path"],
+                timeout_sec=report_cfg["timeout_sec"],
+            ).generate(self._report_events)
+        except Exception as exc:
+            logger.error("Report generation failed: %s", exc)
 
     def run(self, duration_sec: float = 0) -> None:
         """Run the pipeline (main thread blocks).
@@ -384,6 +405,9 @@ class Orchestrator:
     def _emit(self, result: InferenceResult) -> None:
         """Filter through aggregator and send to all outputs."""
         if self._aggregator.should_emit(result):
+            from agent.report import event_record
+
+            self._report_events.append(event_record(result))
             for output in self._outputs:
                 try:
                     output.emit(result)

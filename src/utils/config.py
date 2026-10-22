@@ -62,6 +62,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "mqtt_broker": None,
         "mqtt_topic": "audio-edge/events",
     },
+    "report": {
+        "enabled": False,
+        "model": "qwen2.5:3b",
+        "base_url": "http://localhost:11434",
+        "output_path": "reports/latest.md",
+        "timeout_sec": 45,
+    },
     "logging": {
         "level": "INFO",
         "format": "text",  # "text" or "json"
