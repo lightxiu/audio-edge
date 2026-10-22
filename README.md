@@ -103,6 +103,9 @@ python -m src.cli run
 
 # Run for 10 seconds with mock audio (for testing)
 python -m src.cli run --mock --duration 10
+
+# Generate a local Ollama inspection report at shutdown
+python -m src.cli run --mock --duration 10 --report
 ```
 
 ### CLI Commands
@@ -116,6 +119,32 @@ python -m src.cli list-devices
 
 # Test microphone
 python -m src.cli test-audio --device "USB"
+```
+
+### Local LLM Inspection Report
+
+The optional report module aggregates events already accepted by the event
+deduplicator and sends only compact JSON statistics to a local Ollama server.
+The default model is `qwen2.5:3b`; no cloud API or LangChain dependency is
+required. If Ollama is unavailable, a deterministic Markdown template is
+written so report generation never interrupts the real-time pipeline.
+
+```bash
+ollama serve
+ollama pull qwen2.5:3b
+python -m src.cli run --config configs/windows_dev.yaml --duration 30 --report
+# report: reports/latest.md
+```
+
+Configuration:
+
+```yaml
+report:
+  enabled: false
+  model: qwen2.5:3b
+  base_url: http://localhost:11434
+  output_path: reports/latest.md
+  timeout_sec: 45
 ```
 
 ---
@@ -280,7 +309,8 @@ pre-commit install
 - [x] Phase 5: TensorRT engine builder + benchmarks
 - [ ] Phase 6: Real-model testing on Jetson hardware
 - [ ] MQTT output for IoT integration
-- [ ] WebSocket dashboard for real-time visualization
+- [x] WebSocket dashboard for real-time visualization
+- [x] Optional local-LLM report generation with template fallback
 - [ ] Custom keyword fine-tuning scripts
 - [ ] C++ inference backend option
 
