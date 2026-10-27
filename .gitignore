@@ -48,7 +48,10 @@ Thumbs.db
 .ipynb_checkpoints/
 
 # Build output
-output/
+/output/
+evidence/
+reviews/
+reports/
 
 # Claude
 .claude/

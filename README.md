@@ -121,6 +121,20 @@ python -m src.cli list-devices
 python -m src.cli test-audio --device "USB"
 ```
 
+### Local Sound Event Review (Windows)
+
+`configs/windows_sound_events.yaml` enables strict YAMNet detection of doorbell,
+knock, alarm and siren candidates. A target must be the global top class and
+persist for two inference windows. Accepted candidates are saved to SQLite
+with a one-second WAV evidence window, then can be played and marked confirmed
+or rejected at `http://127.0.0.1:8765`. No microphone audio is committed:
+`reviews/` and `evidence/` are ignored by Git. The dashboard binds only to
+localhost when evidence review is enabled. Reports summarize model events, not
+human review decisions; this is a local trial, not a validated alarm system.
+
+See [Windows sound-event trial](docs/windows_sound_event_trial.md) for the
+microphone procedure and negative-control checks.
+
 ### Local LLM Inspection Report
 
 The optional report module aggregates events already accepted by the event

@@ -27,8 +27,11 @@ import time
 from collections import deque
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, HTMLResponse
+from pydantic import BaseModel, Field
+
+from src.output.review import ReviewStore
 
 # ------------------------------------------------------------------
 # Thread-safe event buffer
@@ -39,6 +42,23 @@ _event_buffer: deque[dict] = deque(maxlen=500)
 
 # Store startup time for uptime display
 _start_time = time.time()
+_review_store: ReviewStore | None = None
+
+
+def configure_review_store(store: ReviewStore | None) -> None:
+    global _review_store
+    _review_store = store
+
+
+def _require_review_store() -> ReviewStore:
+    if _review_store is None:
+        raise HTTPException(status_code=404, detail="Review is not enabled")
+    return _review_store
+
+
+class ReviewDecision(BaseModel):
+    status: str
+    note: str = Field(default="", max_length=500)
 
 
 def push_event(data: dict) -> None:
@@ -85,6 +105,37 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
 )
+
+
+@app.get("/api/candidates")
+def list_candidates(status: str | None = None):
+    store = _require_review_store()
+    try:
+        return store.list(status)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/candidates/{candidate_id}/audio")
+def candidate_audio(candidate_id: str):
+    store = _require_review_store()
+    candidate = store.get(candidate_id)
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    # The filename is generated internally, never constructed from the URL.
+    return FileResponse(store.evidence_dir / candidate["evidence"], media_type="audio/wav")
+
+
+@app.patch("/api/candidates/{candidate_id}")
+def review_candidate(candidate_id: str, decision: ReviewDecision):
+    store = _require_review_store()
+    try:
+        candidate = store.review(candidate_id, decision.status, decision.note)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    return candidate
 
 
 @app.get("/health")

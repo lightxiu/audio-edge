@@ -228,6 +228,16 @@ main {
   font-family: var(--font);
   font-size: 0.9rem;
 }
+.review-section { max-width: 1400px; width: 100%; margin: 0 auto; padding: 0 24px 24px; }
+.review-section h2 { font-size: 1rem; margin-bottom: 12px; }
+.review-row { display: grid; grid-template-columns: 165px minmax(120px, 1fr) 210px 150px;
+  align-items: center; gap: 12px; border-bottom: 1px solid var(--border); padding: 10px 0; }
+.review-row audio { max-width: 100%; width: 210px; height: 36px; }
+.review-actions { display: flex; gap: 6px; }
+.review-actions button { cursor: pointer; border: 1px solid var(--border); border-radius: 4px;
+  background: var(--surface2); color: var(--text); padding: 6px 9px; }
+.review-actions button:hover { border-color: var(--green); }
+.review-status { color: var(--text-dim); font-size: 0.8rem; }
 
 /* ============================================================
    Footer bar
@@ -252,6 +262,8 @@ main {
   header { padding: 12px; }
   .card { min-height: auto; }
   .timeline-row { grid-template-columns: 70px 32px 1fr 60px; font-size: 0.72rem; }
+  .review-row { grid-template-columns: 1fr 1fr; }
+  .review-section { padding: 0 12px 24px; }
 }
 </style>
 </head>
@@ -330,6 +342,11 @@ main {
   </div>
 </div>
 
+<section class="review-section" id="review-section" hidden>
+  <h2>音事件候选复核</h2>
+  <div id="review-list" aria-live="polite"></div>
+</section>
+
 <!-- ============================================================
      Footer
      ============================================================ -->
@@ -380,6 +397,58 @@ main {
   };
 
   let totalEvents = 0;
+  const $reviewSection = document.getElementById('review-section');
+  const $reviewList = document.getElementById('review-list');
+
+  async function loadCandidates() {
+    try {
+      const response = await fetch('/api/candidates');
+      if (!response.ok) return;
+      const candidates = await response.json();
+      $reviewSection.hidden = false;
+      $reviewList.replaceChildren();
+      if (!candidates.length) {
+        const empty = document.createElement('p');
+        empty.className = 'review-status';
+        empty.textContent = '暂无候选事件';
+        $reviewList.appendChild(empty);
+      }
+      for (const candidate of candidates) {
+        const row = document.createElement('div');
+        row.className = 'review-row';
+        const time = document.createElement('span');
+        time.textContent = new Date(candidate.timestamp * 1000).toLocaleString('zh-CN');
+        const label = document.createElement('span');
+        label.textContent = candidate.label + ' · ' + fmtConf(candidate.confidence);
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.preload = 'none';
+        audio.src = '/api/candidates/' + encodeURIComponent(candidate.id) + '/audio';
+        const actions = document.createElement('div');
+        actions.className = 'review-actions';
+        if (candidate.status === 'pending') {
+          for (const [text, status] of [['确认', 'confirmed'], ['驳回', 'rejected']]) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = text;
+            button.onclick = async () => {
+              const res = await fetch('/api/candidates/' + encodeURIComponent(candidate.id), {
+                method: 'PATCH', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status})
+              });
+              if (res.ok) await loadCandidates();
+            };
+            actions.appendChild(button);
+          }
+        } else {
+          actions.className = 'review-status';
+          actions.textContent = candidate.status === 'confirmed' ? '已确认' : '已驳回';
+        }
+        row.append(time, label, audio, actions);
+        $reviewList.appendChild(row);
+      }
+    } catch (e) { /* Server may be restarting. */ }
+  }
 
   // --- Helpers -------------------------------------------------------
   function fmtTime(ts) {
@@ -491,6 +560,8 @@ main {
 
   // --- Kick off ------------------------------------------------------
   connect();
+  loadCandidates();
+  setInterval(loadCandidates, 5000);
 })();
 </script>
 </body>

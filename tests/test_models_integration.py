@@ -81,12 +81,12 @@ class TestYAMNetSED:
             model_path=YAMNET_ONNX,
             labels_path=YAMNET_LABELS,
             threshold=0.3,
-            target_classes=["Speech", "Dog bark"],
+            target_classes=["Speech", "Bark"],
         )
         m.load()
         audio = np.random.randn(32000).astype(np.float32) * 0.01
         result = m.infer(audio)
-        assert result.label in ("Speech", "Dog bark", "Silence")
+        assert result.label in ("Speech", "Bark", "Silence")
 
     def test_fallback_when_model_missing(self):
         """Should fall back to mock when model file doesn't exist."""

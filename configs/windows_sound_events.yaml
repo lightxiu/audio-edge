@@ -1,0 +1,59 @@
+# First real event-detection trial. Check the microphone index with list-devices.
+audio:
+  device: 21
+
+vad:
+  enabled: true
+  model_path: models/vad/silero_vad.onnx
+  threshold: 0.5
+  release_threshold: 0.35
+  min_speech_duration_ms: 300
+  min_silence_duration_ms: 600
+
+kws:
+  enabled: false
+
+sed:
+  enabled: true
+  model_path: models/sed/yamnet.onnx
+  labels_path: models/sed/yamnet_class_map.csv
+  interval_sec: 0.5
+  threshold: 0.25
+  confirm_windows: 2
+  target_classes:
+    - Doorbell
+    - Knock
+    - Alarm
+    - Siren
+
+asc:
+  enabled: false
+
+inference:
+  backend: onnx
+  use_gpu: false
+  strict_models: true
+
+output:
+  console: true
+  jsonl_path: logs/windows_sound_events.jsonl
+  dashboard: true
+  dashboard_host: 127.0.0.1
+  dashboard_port: 8765
+
+review:
+  enabled: true
+  db_path: reviews/candidates.sqlite3
+  evidence_dir: evidence
+
+report:
+  enabled: true
+  model: qwen2.5:3b
+  base_url: http://localhost:11434
+  output_path: reports/windows_sound_events.md
+  timeout_sec: 180
+
+logging:
+  level: INFO
+  format: text
+  file: logs/windows_sound_events.log

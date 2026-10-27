@@ -180,6 +180,9 @@ class YAMNetSED(BaseModel):
 
         if self._target_classes:
             self._target_indices = [idx for idx, name in self._labels.items() if name in self._target_classes]
+            missing = set(self._target_classes) - {self._labels[idx] for idx in self._target_indices}
+            if missing:
+                raise ValueError(f"YAMNet target classes missing from label map: {sorted(missing)}")
             logger.info(f"Filtered to {len(self._target_indices)} target classes")
 
         logger.info(f"YAMNet SED loaded: {len(self._labels)} classes")
@@ -218,18 +221,17 @@ class YAMNetSED(BaseModel):
         if scores.ndim > 1:
             scores = scores.max(axis=0)
 
-        # Find top class
+        # A weak target must not win just because non-targets were hidden.
+        global_idx = int(np.argmax(scores))
         if self._target_classes:
             indices = self._target_indices
-            if not indices:
-                indices = range(len(scores))
         else:
             indices = range(len(scores))
 
         top_idx = max(indices, key=lambda i: scores[i])
         top_score = float(scores[top_idx])
 
-        if top_score >= self._threshold:
+        if top_score >= self._threshold and (not self._target_classes or top_idx == global_idx):
             label = self._labels.get(top_idx, f"class_{top_idx}")
         else:
             label = "Silence"
@@ -242,6 +244,7 @@ class YAMNetSED(BaseModel):
             metadata={
                 "class_index": top_idx,
                 "threshold": self._threshold,
+                "global_top_index": global_idx,
             },
         )
 

@@ -12,7 +12,9 @@ Thread model:
 
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
+from queue import Empty, Full, Queue
 
 import numpy as np
 
@@ -24,8 +26,11 @@ from src.models.sed import MockSED, YAMNetSED
 from src.models.vad import SileroVAD
 from src.output.console import ConsoleOutput
 from src.output.jsonl import JSONLOutput
+from src.output.review import ReviewStore
 from src.pipeline.aggregator import AggregatorConfig, EventAggregator
 from src.pipeline.scheduler import Scheduler
+from src.pipeline.sed_confirmation import SEDConfirmation
+from src.pipeline.vad_state import VADState
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -54,6 +59,9 @@ class Orchestrator:
         self._threads: list[threading.Thread] = []
         self._report_events: list[dict] = []
         self._report_generated = False
+        self._run_id = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S_%f")
+        self._started_at: float | None = None
+        self._ended_at: float | None = None
 
         # --- Audio Capture ---
         audio_cfg = config["audio"]
@@ -76,8 +84,16 @@ class Orchestrator:
                 model_path=vad_cfg["model_path"],
                 threshold=vad_cfg["threshold"],
             )
+            self._vad_state = VADState(
+                sample_rate=audio_cfg["sample_rate"],
+                threshold=vad_cfg["threshold"],
+                release_threshold=vad_cfg.get("release_threshold", vad_cfg["threshold"]),
+                min_speech_duration_ms=vad_cfg["min_speech_duration_ms"],
+                min_silence_duration_ms=vad_cfg["min_silence_duration_ms"],
+            )
         else:
             self._vad = None
+            self._vad_state = None
 
         # --- KWS Model ---
         kws_cfg = config["kws"]
@@ -110,10 +126,18 @@ class Orchestrator:
                     use_gpu=config["inference"]["use_gpu"],
                 )
             else:
+                if config["inference"].get("strict_models", False):
+                    raise FileNotFoundError(f"Required YAMNet SED model not found: {sed_model_path}")
                 logger.info("YAMNet SED model not found, using mock SED")
                 self._sed = MockSED()
         else:
             self._sed = None
+        review_cfg = config.get("review", {})
+        self._review = (
+            ReviewStore(review_cfg["db_path"], review_cfg["evidence_dir"])
+            if review_cfg.get("enabled", False) else None
+        )
+        self._sed_confirmation = SEDConfirmation(sed_cfg.get("confirm_windows", 1))
 
         # --- ASC Model ---
         asc_cfg = config["asc"]
@@ -178,13 +202,15 @@ class Orchestrator:
             from dashboard.output import DashboardOutput
 
             dash_out = DashboardOutput(
+                host=out_cfg.get("dashboard_host", "0.0.0.0"),
                 port=out_cfg.get("dashboard_port", 8765),
+                review_store=self._review,
             )
             self._outputs.append(dash_out)
 
         # --- State ---
-        self._is_speech = False
-        self._vad_buf = np.zeros((0, 1), dtype=np.float32)  # Accumulates for VAD window
+        self._background_audio: Queue[np.ndarray] = Queue(maxsize=128)
+        self._last_audio_drop_warning = 0.0
 
     def start(self) -> None:
         """Start all sub-systems: audio capture, load models, start threads."""
@@ -207,19 +233,25 @@ class Orchestrator:
         if self._asc:
             self._asc.load()
 
+        if self._review:
+            for output in self._outputs:
+                if hasattr(output, "start"):
+                    output.start()
+
         # Start audio capture
         self._capture.start()
+        self._started_at = time.time()
         self._running.set()
 
         # Start VAD processing thread
-        if self._vad:
-            vad_thread = threading.Thread(
-                target=self._vad_loop,
-                name="vad-processor",
+        if self._vad or self._sed or self._asc:
+            capture_thread = threading.Thread(
+                target=self._capture_loop,
+                name="audio-processor",
                 daemon=True,
             )
-            vad_thread.start()
-            self._threads.append(vad_thread)
+            capture_thread.start()
+            self._threads.append(capture_thread)
 
         # Start background inference thread (SED + ASC)
         if self._sed or self._asc:
@@ -235,6 +267,7 @@ class Orchestrator:
         """Stop all sub-systems gracefully."""
         logger.info("Shutting down pipeline...")
         self._running.clear()
+        self._ended_at = time.time()
 
         # Stop threads
         for t in self._threads:
@@ -275,9 +308,10 @@ class Orchestrator:
                 base_url=report_cfg["base_url"],
                 output_path=report_cfg["output_path"],
                 timeout_sec=report_cfg["timeout_sec"],
-            ).generate(self._report_events)
+                run_id=self._run_id,
+            ).generate(self._report_events, started_at=self._started_at, ended_at=self._ended_at)
         except Exception as exc:
-            logger.error("Report generation failed: %s", exc)
+            logger.error("Report generation failed: {}", exc)
 
     def run(self, duration_sec: float = 0) -> None:
         """Run the pipeline (main thread blocks).
@@ -302,11 +336,8 @@ class Orchestrator:
         finally:
             self.stop()
 
-    def _vad_loop(self) -> None:
-        """VAD processing thread.
-
-        Reads audio from capture, runs VAD, dispatches to inference.
-        """
+    def _capture_loop(self) -> None:
+        """Single capture consumer; fan out each chunk to background inference."""
         window_size = 512  # Silero VAD window (32ms @ 16kHz)
 
         while self._running.is_set():
@@ -319,24 +350,28 @@ class Orchestrator:
             if len(audio_chunk) < window_size:
                 continue
 
-            speech_changed = False
+            if self._sed or self._asc:
+                try:
+                    self._background_audio.put_nowait(audio_chunk)
+                except Full:
+                    self._background_audio.get_nowait()
+                    self._background_audio.put_nowait(audio_chunk)
+                    if time.monotonic() - self._last_audio_drop_warning > 5:
+                        logger.warning("Background inference lagging; dropped old audio chunk")
+                        self._last_audio_drop_warning = time.monotonic()
+
             if self._vad:
                 try:
                     result = self._vad.infer(audio_chunk)
-                    was_speech = self._is_speech
-                    self._is_speech = result.label == "speech"
-
-                    if was_speech != self._is_speech:
-                        speech_changed = True
-                        self._emit(result)
+                    transition = self._vad_state.update(result, len(audio_chunk))
+                    if transition:
+                        self._emit(transition)
                 except Exception as e:
                     logger.error(f"VAD error: {e}")
                     continue
 
-            if self._is_speech or speech_changed:
+            if self._vad_state and self._vad_state.is_speech:
                 self._run_inference_speech(audio_chunk)
-            else:
-                self._run_inference_background()
 
     def _run_inference_speech(self, audio_chunk: np.ndarray) -> None:
         if self._kws and self._scheduler.is_due("kws", speech_active=True):
@@ -347,9 +382,6 @@ class Orchestrator:
             except Exception as e:
                 logger.error(f"KWS error: {e}")
             self._scheduler.mark_run("kws")
-
-    def _run_inference_background(self) -> None:
-        pass  # Handled by _background_loop thread
 
     def _background_loop(self) -> None:
         """Background inference thread for SED and ASC tasks.
@@ -364,20 +396,21 @@ class Orchestrator:
         asc_window = int(self._sample_rate * 3.0)  # 3 seconds for ASC
 
         while self._running.is_set():
-            # Read available audio
-            available = self._capture.available
-            if available > 0:
-                chunk = self._capture.read(min(available, 512)).squeeze()
-                if len(chunk) > 0:
+            try:
+                chunk = self._background_audio.get(timeout=0.05)
+                if self._sed:
                     sed_buf = np.concatenate([sed_buf, chunk])
+                if self._asc:
                     asc_buf = np.concatenate([asc_buf, chunk])
+            except Empty:
+                pass
 
             # --- SED Inference (every ~1s) ---
             if self._sed and len(sed_buf) >= sed_window and self._scheduler.is_due("sed"):
                 try:
                     result = self._sed.infer(sed_buf[:sed_window])
-                    if result.label != "Silence":
-                        self._emit(result)
+                    if self._sed_confirmation.update(result):
+                        self._emit(result, evidence_audio=sed_buf[:sed_window])
                 except Exception as e:
                     logger.error(f"SED error: {e}")
                 self._scheduler.mark_run("sed")
@@ -400,11 +433,15 @@ class Orchestrator:
             if len(asc_buf) > max_buf:
                 asc_buf = asc_buf[-max_buf:]
 
-            time.sleep(0.05)  # 50ms polling
 
-    def _emit(self, result: InferenceResult) -> None:
+    def _emit(self, result: InferenceResult, evidence_audio: np.ndarray | None = None) -> None:
         """Filter through aggregator and send to all outputs."""
         if self._aggregator.should_emit(result):
+            if self._review and result.task == "sed" and evidence_audio is not None:
+                try:
+                    result.metadata["candidate_id"] = self._review.add(result, evidence_audio, self._sample_rate)
+                except Exception as exc:
+                    logger.error("Evidence storage failed: {}", exc)
             from agent.report import event_record
 
             self._report_events.append(event_record(result))

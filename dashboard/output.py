@@ -39,11 +39,15 @@ class DashboardOutput:
         Listen port (default ``8765``).
     """
 
-    def __init__(self, host: str = "0.0.0.0", port: int = 8765) -> None:
+    def __init__(self, host: str = "0.0.0.0", port: int = 8765, review_store=None) -> None:
+        if review_store is not None and host not in ("127.0.0.1", "localhost", "::1"):
+            raise ValueError("Evidence review dashboard must bind to localhost")
         self._host = host
         self._port = port
         self._server_thread: threading.Thread | None = None
+        self._server = None
         self._started = False
+        self._review_store = review_store
 
     # -- Output backend protocol ---------------------------------------
 
@@ -70,9 +74,12 @@ class DashboardOutput:
         """Shut down the uvicorn server gracefully."""
         if self._server_thread is not None and self._server_thread.is_alive():
             logger.info("Dashboard server stopping...")
-            # uvicorn.Server.shutdown() is the clean way, but for a daemon
-            # thread a best-effort join is sufficient.
+            self._server.should_exit = True
             self._server_thread.join(timeout=2.0)
+
+    def start(self) -> None:
+        """Make the review page available before the first detection."""
+        self._ensure_server()
 
     # -- Internal ------------------------------------------------------
 
@@ -84,7 +91,8 @@ class DashboardOutput:
 
         import uvicorn
 
-        from dashboard.server import app
+        from dashboard.server import app, configure_review_store
+        configure_review_store(self._review_store)
 
         config = uvicorn.Config(
             app=app,
@@ -95,6 +103,7 @@ class DashboardOutput:
             access_log=False,
         )
         server = uvicorn.Server(config)
+        self._server = server
 
         def _run():
             server.run()
