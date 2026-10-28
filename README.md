@@ -135,6 +135,11 @@ human review decisions; this is a local trial, not a validated alarm system.
 See [Windows sound-event trial](docs/windows_sound_event_trial.md) for the
 microphone procedure and negative-control checks.
 
+Video event integration can ingest the C++ monitor's HTTP JSON payload and
+show nearby audio candidates without changing either inference path. For
+video-only use, `python -m dashboard` starts the local service with no audio
+capture. See [event association trial](docs/audio_video_event_link.md).
+
 ### Local LLM Inspection Report
 
 The optional report module aggregates events already accepted by the event

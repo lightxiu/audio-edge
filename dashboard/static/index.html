@@ -344,7 +344,13 @@ main {
 
 <section class="review-section" id="review-section" hidden>
   <h2>音事件候选复核</h2>
+  <p class="review-status">邻近视频事件仅表示时间接近，尚未验证同一设备或场景。</p>
   <div id="review-list" aria-live="polite"></div>
+</section>
+
+<section class="review-section" id="video-section" hidden>
+  <h2>视频事件</h2>
+  <div id="video-list" aria-live="polite"></div>
 </section>
 
 <!-- ============================================================
@@ -399,27 +405,32 @@ main {
   let totalEvents = 0;
   const $reviewSection = document.getElementById('review-section');
   const $reviewList = document.getElementById('review-list');
+  const $videoSection = document.getElementById('video-section');
+  const $videoList = document.getElementById('video-list');
 
   async function loadCandidates() {
     try {
-      const response = await fetch('/api/candidates');
+      const response = await fetch('/api/associations');
       if (!response.ok) return;
-      const candidates = await response.json();
+      const associations = await response.json();
       $reviewSection.hidden = false;
       $reviewList.replaceChildren();
-      if (!candidates.length) {
+      if (!associations.length) {
         const empty = document.createElement('p');
         empty.className = 'review-status';
         empty.textContent = '暂无候选事件';
         $reviewList.appendChild(empty);
       }
-      for (const candidate of candidates) {
+      for (const association of associations) {
+        const candidate = association.audio;
         const row = document.createElement('div');
         row.className = 'review-row';
         const time = document.createElement('span');
         time.textContent = new Date(candidate.timestamp * 1000).toLocaleString('zh-CN');
         const label = document.createElement('span');
-        label.textContent = candidate.label + ' · ' + fmtConf(candidate.confidence);
+        const video = association.nearby_video;
+        label.textContent = candidate.label + ' · ' + fmtConf(candidate.confidence) +
+          (video.length ? ' · 邻近视频: ' + video.map(item => item.type).join(', ') : ' · 无邻近视频事件');
         const audio = document.createElement('audio');
         audio.controls = true;
         audio.preload = 'none';
@@ -446,6 +457,34 @@ main {
         }
         row.append(time, label, audio, actions);
         $reviewList.appendChild(row);
+      }
+    } catch (e) { /* Server may be restarting. */ }
+  }
+
+  async function loadVideoEvents() {
+    try {
+      const response = await fetch('/api/video-events');
+      if (!response.ok) return;
+      const events = await response.json();
+      $videoSection.hidden = false;
+      $videoList.replaceChildren();
+      if (!events.length) {
+        const empty = document.createElement('p');
+        empty.className = 'review-status';
+        empty.textContent = '暂无视频事件';
+        $videoList.appendChild(empty);
+      }
+      for (const event of events) {
+        const row = document.createElement('div');
+        row.className = 'review-row';
+        const time = document.createElement('span');
+        time.textContent = new Date(event.timestamp_ms).toLocaleString('zh-CN');
+        const source = document.createElement('span');
+        source.textContent = event.type + ' · ' + event.source_id;
+        const objects = document.createElement('span');
+        objects.textContent = event.payload.objects.map(item => item.name).join(', ') || '无目标';
+        row.append(time, source, objects);
+        $videoList.appendChild(row);
       }
     } catch (e) { /* Server may be restarting. */ }
   }
@@ -561,7 +600,8 @@ main {
   // --- Kick off ------------------------------------------------------
   connect();
   loadCandidates();
-  setInterval(loadCandidates, 5000);
+  loadVideoEvents();
+  setInterval(() => { loadCandidates(); loadVideoEvents(); }, 5000);
 })();
 </script>
 </body>

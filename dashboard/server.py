@@ -61,6 +61,21 @@ class ReviewDecision(BaseModel):
     note: str = Field(default="", max_length=500)
 
 
+class VideoObject(BaseModel):
+    label: int
+    name: str = Field(max_length=120)
+    probability: float = Field(ge=0, le=1)
+    box: tuple[float, float, float, float]
+
+
+class VideoEvent(BaseModel):
+    type: str = Field(min_length=1, max_length=120)
+    timestamp: int = Field(ge=946684800000)  # Unix epoch milliseconds, year 2000 onward
+    count: int = Field(ge=0)
+    objects: list[VideoObject] = Field(max_length=100)
+    message: str = Field(default="", max_length=1000)
+
+
 def push_event(data: dict) -> None:
     """Push one event into the buffer (thread-safe).
 
@@ -105,6 +120,37 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
 )
+
+
+@app.post("/api/video-events", status_code=201)
+def ingest_video_event(event: VideoEvent, source_id: str = "unspecified"):
+    store = _require_review_store()
+    if len(source_id) > 120 or not source_id.strip():
+        raise HTTPException(status_code=422, detail="Invalid source_id")
+    if event.count != len(event.objects):
+        raise HTTPException(status_code=422, detail="count must equal objects length")
+    payload = event.model_dump() if hasattr(event, "model_dump") else event.dict()
+    return store.add_video_event(payload, source_id)
+
+
+@app.get("/api/video-events")
+def list_video_events():
+    return _require_review_store().list_video_events()
+
+
+@app.get("/api/associations")
+def list_associations(window_sec: float = 5.0):
+    if not 0 <= window_sec <= 60:
+        raise HTTPException(status_code=422, detail="window_sec must be between 0 and 60")
+    store = _require_review_store()
+    return [
+        {
+            "audio": audio,
+            "nearby_video": store.nearby_video_events(audio["timestamp"], window_sec),
+            "relationship": "temporal_only",
+        }
+        for audio in store.list()
+    ]
 
 
 @app.get("/api/candidates")
