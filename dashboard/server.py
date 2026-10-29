@@ -147,7 +147,8 @@ def list_associations(window_sec: float = 5.0):
         {
             "audio": audio,
             "nearby_video": store.nearby_video_events(audio["timestamp"], window_sec),
-            "relationship": "temporal_only",
+            "media_evidence": store.get_media_evidence(audio["id"]),
+            "relationship": "same_media_file" if store.get_media_evidence(audio["id"]) else "temporal_only",
         }
         for audio in store.list()
     ]
@@ -170,6 +171,15 @@ def candidate_audio(candidate_id: str):
         raise HTTPException(status_code=404, detail="Candidate not found")
     # The filename is generated internally, never constructed from the URL.
     return FileResponse(store.evidence_dir / candidate["evidence"], media_type="audio/wav")
+
+
+@app.get("/api/candidates/{candidate_id}/video")
+def candidate_video(candidate_id: str):
+    store = _require_review_store()
+    media = store.get_media_evidence(candidate_id)
+    if media is None:
+        raise HTTPException(status_code=404, detail="Video evidence not found")
+    return FileResponse(store.evidence_dir / media["video_file"], media_type="video/mp4")
 
 
 @app.patch("/api/candidates/{candidate_id}")

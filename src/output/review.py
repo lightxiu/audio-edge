@@ -31,6 +31,10 @@ class ReviewStore:
                 event_type TEXT NOT NULL, source_id TEXT NOT NULL,
                 payload TEXT NOT NULL)""")
             db.execute("CREATE INDEX IF NOT EXISTS video_time_idx ON video_events(timestamp_ms)")
+            db.execute("""CREATE TABLE IF NOT EXISTS media_evidence (
+                candidate_id TEXT PRIMARY KEY REFERENCES candidates(id),
+                source_id TEXT NOT NULL, media_offset_sec REAL NOT NULL,
+                video_file TEXT NOT NULL)""")
 
     def _connect(self):
         db = sqlite3.connect(self.db_path, timeout=5)
@@ -121,3 +125,23 @@ class ReviewStore:
                 (center_ms - window_ms, center_ms + window_ms, center_ms),
             ).fetchall()
             return [self._video_record(row) for row in rows]
+
+    def add_media_evidence(self, candidate_id: str, source_id: str, media_offset_sec: float, video_file: str) -> None:
+        if not self.get(candidate_id) or Path(video_file).name != video_file:
+            raise ValueError("invalid media evidence")
+        if not (self.evidence_dir / video_file).is_file():
+            raise FileNotFoundError(video_file)
+        with self._connect() as db:
+            db.execute(
+                "INSERT INTO media_evidence (candidate_id, source_id, media_offset_sec, video_file) "
+                "VALUES (?, ?, ?, ?)",
+                (candidate_id, source_id, media_offset_sec, video_file),
+            )
+
+    def get_media_evidence(self, candidate_id: str) -> dict | None:
+        with self._connect() as db:
+            row = db.execute(
+                "SELECT candidate_id, source_id, media_offset_sec, video_file "
+                "FROM media_evidence WHERE candidate_id = ?", (candidate_id,)
+            ).fetchone()
+            return dict(row) if row else None

@@ -233,6 +233,7 @@ main {
 .review-row { display: grid; grid-template-columns: 165px minmax(120px, 1fr) 210px 150px;
   align-items: center; gap: 12px; border-bottom: 1px solid var(--border); padding: 10px 0; }
 .review-row audio { max-width: 100%; width: 210px; height: 36px; }
+.review-row video { max-width: 100%; width: 210px; margin-top: 6px; }
 .review-actions { display: flex; gap: 6px; }
 .review-actions button { cursor: pointer; border: 1px solid var(--border); border-radius: 4px;
   background: var(--surface2); color: var(--text); padding: 6px 9px; }
@@ -344,7 +345,7 @@ main {
 
 <section class="review-section" id="review-section" hidden>
   <h2>音事件候选复核</h2>
-  <p class="review-status">邻近视频事件仅表示时间接近，尚未验证同一设备或场景。</p>
+  <p class="review-status">邻近视频事件仅表示时间接近；候选附带的视频片段则来自同一个媒体文件，均需人工复核。</p>
   <div id="review-list" aria-live="polite"></div>
 </section>
 
@@ -431,10 +432,20 @@ main {
         const video = association.nearby_video;
         label.textContent = candidate.label + ' · ' + fmtConf(candidate.confidence) +
           (video.length ? ' · 邻近视频: ' + video.map(item => item.type).join(', ') : ' · 无邻近视频事件');
+        const media = document.createElement('div');
         const audio = document.createElement('audio');
         audio.controls = true;
         audio.preload = 'none';
         audio.src = '/api/candidates/' + encodeURIComponent(candidate.id) + '/audio';
+        media.appendChild(audio);
+        if (association.media_evidence) {
+          const videoClip = document.createElement('video');
+          videoClip.controls = true;
+          videoClip.preload = 'none';
+          videoClip.title = '同一媒体文件的视频证据';
+          videoClip.src = '/api/candidates/' + encodeURIComponent(candidate.id) + '/video';
+          media.appendChild(videoClip);
+        }
         const actions = document.createElement('div');
         actions.className = 'review-actions';
         if (candidate.status === 'pending') {
@@ -455,7 +466,7 @@ main {
           actions.className = 'review-status';
           actions.textContent = candidate.status === 'confirmed' ? '已确认' : '已驳回';
         }
-        row.append(time, label, audio, actions);
+        row.append(time, label, media, actions);
         $reviewList.appendChild(row);
       }
     } catch (e) { /* Server may be restarting. */ }

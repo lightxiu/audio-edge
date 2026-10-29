@@ -139,6 +139,9 @@ Video event integration can ingest the C++ monitor's HTTP JSON payload and
 show nearby audio candidates without changing either inference path. For
 video-only use, `python -m dashboard` starts the local service with no audio
 capture. See [event association trial](docs/audio_video_event_link.md).
+With FFmpeg installed, `python -m src.pipeline.media_import recording.mp4
+--recorded-at 2026-10-29T14:00:00+08:00` can import an audio track and generate
+short video evidence from the same file. It does not access the microphone.
 
 ### Local LLM Inspection Report
 
