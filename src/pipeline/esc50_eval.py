@@ -34,6 +34,15 @@ NEGATIVE = (
 )
 
 
+def accepted_labels(category: str, targets: list[str]) -> set[str]:
+    """Map an ESC-50 positive class to the enabled YAMNet labels."""
+    expected = POSITIVE.get(category)
+    accepted = {expected} if expected else set()
+    if category == "clock_alarm" and "Alarm clock" in targets:
+        accepted.add("Alarm clock")
+    return accepted
+
+
 def read_wav(data: bytes) -> np.ndarray:
     """Decode ESC-50 PCM WAV and resample to the model's 16 kHz input."""
     with wave.open(io.BytesIO(data), "rb") as wav:
@@ -101,10 +110,11 @@ def evaluate_archive(archive: Path, config: dict, fold: int = 1, samples_per_cla
                     )
                     expected = POSITIVE.get(category)
                     labels = {item["label"] for item in detections}
+                    accepted = accepted_labels(category, sed_cfg.get("target_classes", []))
                     rows.append({
                         "filename": row["filename"], "category": category,
-                        "expected": expected, "detected": detections,
-                        "correct_target_detected": expected in labels if expected else None,
+                        "expected": expected, "accepted_labels": sorted(accepted), "detected": detections,
+                        "correct_target_detected": bool(accepted & labels) if expected else None,
                         "any_target_detected": bool(labels),
                     })
         finally:

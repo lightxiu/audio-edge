@@ -34,6 +34,14 @@ def test_wav_resampling_and_confirmation():
     assert found == [{"label": "Knock", "confidence": 0.8, "offset_sec": 1.0}]
 
 
+def test_clock_alarm_label_accepted_only_when_enabled():
+    assert esc50_eval.accepted_labels("clock_alarm", ["Alarm"]) == {"Alarm"}
+    assert esc50_eval.accepted_labels("clock_alarm", ["Alarm", "Alarm clock"]) == {
+        "Alarm", "Alarm clock"
+    }
+    assert esc50_eval.accepted_labels("rain", ["Alarm clock"]) == set()
+
+
 def test_archive_selection_and_metrics(tmp_path, monkeypatch):
     archive = tmp_path / "ESC-50-master.zip"
     csv_data = "filename,fold,target,category,esc10,src_file,take\n"

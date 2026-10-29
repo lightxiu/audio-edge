@@ -195,31 +195,7 @@ class YAMNetSED(BaseModel):
             mock._is_loaded = True
             return mock._infer(audio)
 
-        input_name = self._model.get_inputs()[0].name
-
-        # Detect input type by rank:
-        #   rank ≤ 2 → waveform (raw audio, 1-D or 2-D with batch)
-        #   rank ≥ 3 → mel spectrogram (batch, frames, mel_bands)
-        input_shape = self._model.get_inputs()[0].shape
-        if len(input_shape) <= 2:
-            # Waveform model — feed raw audio, request scores first
-            audio_in = audio.astype(np.float32)
-            scores, _embeddings = self._model.run(
-                ["scores", "embeddings"], {input_name: audio_in}
-            )
-        else:
-            # Mel spectrogram model — pre-compute mel
-            mel_spec = self._extract_yamnet_mel(audio)
-            mel_spec = mel_spec.astype(np.float32).reshape(1, 96, 64)
-            scores, _embeddings = self._model.run(
-                ["scores", "embeddings"], {input_name: mel_spec}
-            )
-
-        scores = scores.squeeze()
-
-        # Max-pool across frames for per-frame models
-        if scores.ndim > 1:
-            scores = scores.max(axis=0)
+        scores = self.class_scores(audio)
 
         # A weak target must not win just because non-targets were hidden.
         global_idx = int(np.argmax(scores))
@@ -247,6 +223,39 @@ class YAMNetSED(BaseModel):
                 "global_top_index": global_idx,
             },
         )
+
+    def class_scores(self, audio: np.ndarray) -> np.ndarray:
+        """Return all 521 class scores for offline diagnostics (no mock fallback)."""
+        self.validate_audio(audio)
+        if self._model is None:
+            raise RuntimeError("Real YAMNet model must be loaded for class_scores")
+        input_name = self._model.get_inputs()[0].name
+
+        # Detect input type by rank:
+        #   rank ≤ 2 → waveform (raw audio, 1-D or 2-D with batch)
+        #   rank ≥ 3 → mel spectrogram (batch, frames, mel_bands)
+        input_shape = self._model.get_inputs()[0].shape
+        if len(input_shape) <= 2:
+            # Waveform model — feed raw audio, request scores first
+            audio_in = audio.astype(np.float32)
+            scores, _embeddings = self._model.run(
+                ["scores", "embeddings"], {input_name: audio_in}
+            )
+        else:
+            # Mel spectrogram model — pre-compute mel
+            mel_spec = self._extract_yamnet_mel(audio)
+            mel_spec = mel_spec.astype(np.float32).reshape(1, 96, 64)
+            scores, _embeddings = self._model.run(
+                ["scores", "embeddings"], {input_name: mel_spec}
+            )
+
+        scores = scores.squeeze()
+
+        # Max-pool across frames for per-frame models
+        if scores.ndim > 1:
+            scores = scores.max(axis=0)
+
+        return scores
 
     @staticmethod
     def _extract_yamnet_mel(audio: np.ndarray) -> np.ndarray:
