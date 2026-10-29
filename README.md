@@ -143,6 +143,10 @@ With FFmpeg installed, `python -m src.pipeline.media_import recording.mp4
 --recorded-at 2026-10-29T14:00:00+08:00` can import an audio track and generate
 short video evidence from the same file. It does not access the microphone.
 
+For a reproducible audio-only check without FFmpeg, run
+`python -m src.pipeline.esc50_eval ESC-50-master.zip` on a local ESC-50 archive.
+See [ESC-50 evaluation](docs/esc50_evaluation.md) for classes and limitations.
+
 ### Local LLM Inspection Report
 
 The optional report module aggregates events already accepted by the event
