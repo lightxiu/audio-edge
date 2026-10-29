@@ -73,6 +73,15 @@ class ReviewStore:
             row = db.execute("SELECT * FROM candidates WHERE id = ?", (candidate_id,)).fetchone()
             return dict(row) if row else None
 
+    def candidates_between(self, start: float, end: float, limit: int = 50) -> list[dict]:
+        """Read a bounded time window for evidence-backed inspection."""
+        with self._connect() as db:
+            rows = db.execute(
+                "SELECT * FROM candidates WHERE timestamp BETWEEN ? AND ? "
+                "ORDER BY timestamp DESC, id DESC LIMIT ?", (start, end, limit)
+            ).fetchall()
+            return [dict(row) for row in rows]
+
     def review(self, candidate_id: str, status: str, note: str = "") -> dict | None:
         if status not in ("confirmed", "rejected"):
             raise ValueError("invalid review status")
@@ -112,6 +121,15 @@ class ReviewStore:
         with self._connect() as db:
             rows = db.execute(
                 "SELECT * FROM video_events ORDER BY timestamp_ms DESC, id DESC LIMIT ?", (limit,)
+            ).fetchall()
+            return [self._video_record(row) for row in rows]
+
+    def video_events_between(self, start: float, end: float, limit: int = 50) -> list[dict]:
+        with self._connect() as db:
+            rows = db.execute(
+                "SELECT * FROM video_events WHERE timestamp_ms BETWEEN ? AND ? "
+                "ORDER BY timestamp_ms DESC, id DESC LIMIT ?",
+                (round(start * 1000), round(end * 1000), limit),
             ).fetchall()
             return [self._video_record(row) for row in rows]
 

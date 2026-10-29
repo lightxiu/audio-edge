@@ -239,6 +239,17 @@ main {
   background: var(--surface2); color: var(--text); padding: 6px 9px; }
 .review-actions button:hover { border-color: var(--green); }
 .review-status { color: var(--text-dim); font-size: 0.8rem; }
+.inspection-form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.inspection-form input { background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); padding: 8px; border-radius: 4px; min-width: 0; }
+.inspection-form input[type="text"] { flex: 1 1 260px; }
+.inspection-form button { cursor: pointer; background: var(--surface2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px; padding: 8px 14px; }
+.inspection-form button:disabled { opacity: 0.5; cursor: wait; }
+.inspection-result { line-height: 1.6; }
+.inspection-result ul { list-style: none; padding: 0; }
+.inspection-result li { padding: 8px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.inspection-result a { color: var(--blue); margin-left: 8px; }
 
 /* ============================================================
    Footer bar
@@ -354,6 +365,17 @@ main {
   <div id="video-list" aria-live="polite"></div>
 </section>
 
+<section class="review-section" id="inspection-section">
+  <h2>巡检查询</h2>
+  <form id="inspection-form" class="inspection-form">
+    <input id="inspection-question" type="text" maxlength="300" required value="这段时间有哪些待复核事件？" aria-label="巡检问题">
+    <input id="inspection-start" type="datetime-local" required aria-label="开始时间">
+    <input id="inspection-end" type="datetime-local" required aria-label="结束时间">
+    <button id="inspection-submit" type="submit">查询</button>
+  </form>
+  <div id="inspection-result" class="inspection-result" aria-live="polite"></div>
+</section>
+
 <!-- ============================================================
      Footer
      ============================================================ -->
@@ -408,6 +430,65 @@ main {
   const $reviewList = document.getElementById('review-list');
   const $videoSection = document.getElementById('video-section');
   const $videoList = document.getElementById('video-list');
+  const $inspectionForm = document.getElementById('inspection-form');
+  const $inspectionResult = document.getElementById('inspection-result');
+  const $inspectionButton = document.getElementById('inspection-submit');
+
+  function localInputValue(date) {
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 16);
+  }
+  document.getElementById('inspection-end').value = localInputValue(new Date());
+  document.getElementById('inspection-start').value = localInputValue(new Date(Date.now() - 3600000));
+
+  $inspectionForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    $inspectionButton.disabled = true;
+    $inspectionResult.textContent = '正在查询...';
+    try {
+      const response = await fetch('/api/inspection', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: document.getElementById('inspection-question').value,
+          start: new Date(document.getElementById('inspection-start').value).getTime() / 1000,
+          end: new Date(document.getElementById('inspection-end').value).getTime() / 1000,
+        }),
+      });
+      if (!response.ok) throw new Error('查询失败：请检查时间范围（最长 24 小时）及服务状态。');
+      const report = await response.json();
+      $inspectionResult.replaceChildren();
+      const summary = document.createElement('p');
+      summary.textContent = report.summary;
+      const mode = document.createElement('p');
+      mode.className = 'review-status';
+      mode.textContent = (report.source === 'ollama' ? '本地模型选取复核重点' : '按时间与待复核状态排序') + '；' + report.caution;
+      $inspectionResult.append(summary, mode);
+      const list = document.createElement('ul');
+      for (const item of report.evidence) {
+        const row = document.createElement('li');
+        const focus = report.focus_ids.includes(item.id) ? '重点复核 · ' : '';
+        const status = { pending: '待复核', confirmed: '已确认', rejected: '已驳回',
+          unreviewed: '未复核' }[item.status] || item.status;
+        const relation = { same_media_file: '同一媒体文件', temporal_only: '仅时间接近',
+          none: '无关联证据' }[item.relation] || item.relation;
+        row.textContent = focus + new Date(item.timestamp * 1000).toLocaleString('zh-CN') +
+          ' · ' + (item.kind === 'audio' ? '音频' : '视频') + ' · ' + item.label +
+          ' · ' + status + ' · ' + relation + ' · ID ' + item.id;
+        for (const [label, url] of [['回听', item.audio_url], ['看片段', item.video_url]]) {
+          if (!url) continue;
+          const link = document.createElement('a');
+          link.href = url; link.target = '_blank'; link.rel = 'noopener'; link.textContent = label;
+          row.appendChild(link);
+        }
+        list.appendChild(row);
+      }
+      $inspectionResult.appendChild(list);
+    } catch (error) {
+      $inspectionResult.textContent = error.message;
+    } finally {
+      $inspectionButton.disabled = false;
+    }
+  });
 
   async function loadCandidates() {
     try {

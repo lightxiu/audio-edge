@@ -124,7 +124,7 @@ python -m src.cli test-audio --device "USB"
 ### Local Sound Event Review (Windows)
 
 `configs/windows_sound_events.yaml` enables strict YAMNet detection of doorbell,
-knock, alarm and siren candidates. A target must be the global top class and
+knock, alarm, alarm clock and siren candidates. A target must be the global top class and
 persist for two inference windows. Accepted candidates are saved to SQLite
 with a one-second WAV evidence window, then can be played and marked confirmed
 or rejected at `http://127.0.0.1:8765`. No microphone audio is committed:
@@ -146,6 +146,13 @@ short video evidence from the same file. It does not access the microphone.
 For a reproducible audio-only check without FFmpeg, run
 `python -m src.pipeline.esc50_eval ESC-50-master.zip` on a local ESC-50 archive.
 See [ESC-50 evaluation](docs/esc50_evaluation.md) for classes and limitations.
+
+The local dashboard also has an evidence-bound inspection query: choose a
+time range (up to 24 hours) and ask which recorded candidates need review.
+It works with audio-only or video-only records. Ollama can prioritize up to
+three existing event IDs; it cannot create records or change review status.
+Without Ollama, the same evidence is returned in a deterministic order. See
+[inspection trial](docs/inspection_agent_trial.md) for a no-media smoke test.
 
 ### Local LLM Inspection Report
 

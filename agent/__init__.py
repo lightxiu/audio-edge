@@ -1,11 +1,10 @@
-"""Edge AI Agent — LLM-powered voice assistant with tool use.
+"""Legacy Ollama conversational client; inspection tools live in agent.inspection.
 
 Self-contained module.  Uses Ollama (llama.cpp backend) for local LLM
 inference, sherpa-onnx for STT, Piper TTS for speech output.
 
-Architecture: ReAct (Reasoning + Acting) pattern —
-the agent thinks, decides which tool to call, observes the result,
-and repeats until it has an answer.
+This conversational client does not yet execute the tools described in its
+prompt; do not rely on it for evidence-backed monitoring answers.
 """
 
 from __future__ import annotations
@@ -142,25 +141,13 @@ class EdgeAgent:
             return self._mock_response(prompt)
 
     def _mock_response(self, prompt: str) -> str:
-        """Mock agent response when Ollama is unavailable."""
-        # Simple keyword matching for demo
-        prompt_lower = prompt.lower()
-
-        if "有人" in prompt_lower or "经过" in prompt_lower or "person" in prompt_lower:
-            return "根据监控记录，过去一小时内检测到 2 次人员经过，最近一次是 10 分钟前。"
-        elif "状态" in prompt_lower or "温度" in prompt_lower or "内存" in prompt_lower:
-            return "当前系统状态正常：CPU 温度 58°C，GPU 温度 62°C，内存使用 8.2GB/16GB，磁盘使用 45%。"
-        elif "时间" in prompt_lower:
-            return f"现在是 {time.strftime('%H:%M:%S')}。"
-        elif "你好" in prompt_lower or "hello" in prompt_lower:
-            return "你好！我是哨兵，有什么可以帮你的？"
-        else:
-            return f"收到。关于「{prompt[:50]}」的问题，我正在学习中，目前可以帮你查询监控事件和系统状态。"
+        """Never invent monitoring events or device measurements offline."""
+        return "本地语言模型不可用，无法回答监控事件或设备状态；请通过巡检查询查看已记录的证据。"
 
 
 def _default_tools() -> dict[str, Any]:
     """Return the default tool set."""
-    from memory.query import format_query_results, query_events, query_recent
+    from memory.query import format_query_results, query_events
 
     def _query_events(query: str) -> str:
         results = query_events(query, top_k=5)

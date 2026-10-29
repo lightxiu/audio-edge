@@ -22,6 +22,7 @@ Endpoint summary
 from __future__ import annotations
 
 import asyncio
+import math
 import threading
 import time
 from collections import deque
@@ -74,6 +75,12 @@ class VideoEvent(BaseModel):
     count: int = Field(ge=0)
     objects: list[VideoObject] = Field(max_length=100)
     message: str = Field(default="", max_length=1000)
+
+
+class InspectionRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=300)
+    start: float
+    end: float
 
 
 def push_event(data: dict) -> None:
@@ -152,6 +159,20 @@ def list_associations(window_sec: float = 5.0):
         }
         for audio in store.list()
     ]
+
+
+@app.post("/api/inspection")
+def inspect_events(request: InspectionRequest):
+    from agent.inspection import InspectionAgent
+
+    if not (math.isfinite(request.start) and math.isfinite(request.end)
+            and 946684800 <= request.start < request.end <= time.time() + 60
+            and request.end - request.start <= 86400):
+        raise HTTPException(status_code=422, detail="Choose a past time range of at most 24 hours")
+    try:
+        return InspectionAgent(_require_review_store()).inspect(request.question, request.start, request.end)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.get("/api/candidates")
